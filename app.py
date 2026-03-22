@@ -213,6 +213,17 @@ def init_db():
     except sqlite3.OperationalError:
         pass
 
+    # Seed test users if they don't exist
+    test_users = [
+        ('naruto@leafvillage.com', 'NARUTO', 'Hinata', 'Leaf Village', 'Hokage', 'React, Node.js, Leadership'),
+        ('sasuke@leafvillage.com', 'SASUKE', 'Sakura', 'Leaf Village', 'ANBU Captain', 'Python, Security, Strategy'),
+    ]
+    for email, username, pw, company, role, skills in test_users:
+        existing = c.execute('SELECT id FROM users WHERE email=?', (email,)).fetchone()
+        if not existing:
+            c.execute('INSERT INTO users (email, username, password, company, role, skills) VALUES (?,?,?,?,?,?)',
+                      (email, username, generate_password_hash(pw), company, role, skills))
+
     conn.commit()
     conn.close()
 
