@@ -820,6 +820,9 @@ async function loadNotifications() {
         if (n.type === 'message') {
             clickAction = `onclick="navigateToChat(${n.from_user_id}, '${esc(n.username)}')"`;
             clickClass = 'clickable-notif';
+        } else if (n.type === 'story_reaction' || n.type === 'story_reply') {
+            clickAction = `onclick="navigateToChat(${n.from_user_id}, '${esc(n.username)}')"`;
+            clickClass = 'clickable-notif';
         } else if (n.type === 'new_post' || n.type === 'comment') {
             if (n.related_id) {
                 clickAction = `onclick="navigateToPost(${n.related_id})"`;
@@ -1172,13 +1175,16 @@ function showStorySlide() {
     document.getElementById('storyViewer').style.background = s.media_url ? '#000' : (s.bg_color || '#7c3aed');
     const deleteBtn = document.getElementById('storyDeleteBtn');
     if (deleteBtn) deleteBtn.style.display = s.is_own ? 'block' : 'none';
-    // Reactions display
+    // Reactions display + view count
     const reactionsDisplay = document.getElementById('storyReactionsDisplay');
+    let reactHtml = '';
     if (s.reactions && Object.keys(s.reactions).length > 0) {
-        reactionsDisplay.innerHTML = Object.entries(s.reactions).map(([r, c]) => `${r} ${c}`).join('  ');
-    } else {
-        reactionsDisplay.innerHTML = '';
+        reactHtml = Object.entries(s.reactions).map(([r, c]) => `${r} ${c}`).join('  ');
     }
+    if (s.is_own) {
+        reactHtml += `  <span style="cursor:pointer;" onclick="showStoryInsights()">👁️ ${s.view_count || 0} views</span>`;
+    }
+    reactionsDisplay.innerHTML = reactHtml;
     // Highlight user's reaction
     document.querySelectorAll('.story-emoji-bar button').forEach(btn => btn.classList.remove('active-reaction'));
     if (s.user_reaction) {
@@ -1200,6 +1206,37 @@ function showStorySlide() {
     document.getElementById('storyViewerContent').innerHTML = contentHtml;
     document.getElementById('storyReplyInput').value = '';
     closeStoryMenu();
+    // Track view
+    if (!s.is_own) {
+        fetch(`/api/stories/${s.id}/view`, { method:'POST' }).catch(() => {});
+    }
+}
+
+function showStoryInsights() {
+    const s = storyViewData[storyViewIndex];
+    if (!s || !s.is_own) return;
+    let html = '<div style="background:rgba(0,0,0,0.85);position:fixed;inset:0;z-index:10000;display:flex;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)this.remove()">';
+    html += '<div style="background:white;color:#333;width:100%;max-width:420px;max-height:60vh;border-radius:1rem 1rem 0 0;overflow-y:auto;padding:1rem;">';
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;"><h3 style="margin:0;">👁️ ${s.view_count || 0} Views</h3><button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">✕</button></div>`;
+    if (s.reactors && s.reactors.length > 0) {
+        html += '<div style="margin-bottom:1rem;"><div style="font-weight:700;font-size:0.85rem;color:#7c3aed;margin-bottom:0.5rem;">Reactions</div>';
+        s.reactors.forEach(r => {
+            html += `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;"><span style="font-size:1.2rem;">${r.reaction}</span><span style="font-weight:600;">${esc(r.username)}</span></div>`;
+        });
+        html += '</div>';
+    }
+    if (s.viewers && s.viewers.length > 0) {
+        html += '<div><div style="font-weight:700;font-size:0.85rem;color:#666;margin-bottom:0.5rem;">Viewers</div>';
+        s.viewers.forEach(v => {
+            html += `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;"><div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:white;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;">${v.username[0].toUpperCase()}</div><span style="font-weight:600;">${esc(v.username)}</span></div>`;
+        });
+        html += '</div>';
+    }
+    if ((!s.viewers || s.viewers.length === 0) && (!s.reactors || s.reactors.length === 0)) {
+        html += '<p style="text-align:center;color:#999;padding:1rem;">No views yet</p>';
+    }
+    html += '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
 }
 
 async function reactToStory(emoji) {

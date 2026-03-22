@@ -175,6 +175,16 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
+    c.execute('''CREATE TABLE IF NOT EXISTS story_views (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        story_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (story_id) REFERENCES stories(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(story_id, user_id)
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reporter_id INTEGER NOT NULL,
@@ -968,6 +978,20 @@ def get_stories():
         sd['reactions'] = {r['reaction']: r['cnt'] for r in reactions}
         user_reaction = conn.execute('SELECT reaction FROM story_reactions WHERE story_id=? AND user_id=?', (s['id'], session['user_id'])).fetchone()
         sd['user_reaction'] = user_reaction['reaction'] if user_reaction else None
+        view_count = conn.execute('SELECT COUNT(*) as cnt FROM story_views WHERE story_id=?', (s['id'],)).fetchone()['cnt']
+        sd['view_count'] = view_count
+        if uid == session['user_id']:
+            viewers = conn.execute('''SELECT sv.user_id, u.username, sv.created_at
+                                      FROM story_views sv JOIN users u ON sv.user_id=u.id
+                                      WHERE sv.story_id=? ORDER BY sv.created_at DESC''', (s['id'],)).fetchall()
+            sd['viewers'] = [dict(v) for v in viewers]
+            reactors = conn.execute('''SELECT sr.user_id, u.username, sr.reaction
+                                       FROM story_reactions sr JOIN users u ON sr.user_id=u.id
+                                       WHERE sr.story_id=?''', (s['id'],)).fetchall()
+            sd['reactors'] = [dict(r) for r in reactors]
+        else:
+            sd['viewers'] = []
+            sd['reactors'] = []
         grouped[uid]['stories'].append(sd)
     conn.close()
     return jsonify(list(grouped.values()))
@@ -1008,16 +1032,26 @@ def react_to_story(story_id):
     data = request.json
     reaction = data.get('reaction', '❤️')
     conn = get_db()
+    story = conn.execute('SELECT user_id FROM stories WHERE id=?', (story_id,)).fetchone()
     existing = conn.execute('SELECT id, reaction FROM story_reactions WHERE story_id=? AND user_id=?',
                             (story_id, session['user_id'])).fetchone()
+    is_new = False
     if existing:
         if existing['reaction'] == reaction:
             conn.execute('DELETE FROM story_reactions WHERE id=?', (existing['id'],))
         else:
             conn.execute('UPDATE story_reactions SET reaction=? WHERE id=?', (reaction, existing['id']))
+            is_new = True
     else:
         conn.execute('INSERT INTO story_reactions (story_id, user_id, reaction) VALUES (?,?,?)',
                      (story_id, session['user_id'], reaction))
+        is_new = True
+    # Send reaction as chat message and notification
+    if is_new and story and story['user_id'] != session['user_id']:
+        conn.execute('INSERT INTO messages (sender_id, receiver_id, message) VALUES (?,?,?)',
+                     (session['user_id'], story['user_id'], f'Reacted {reaction} to your story'))
+        create_notification(story['user_id'], session['user_id'], 'story_reaction',
+                           f'{session["username"]} reacted {reaction} to your story', conn)
     conn.commit()
     conn.close()
     return jsonify({'message': 'Reacted'})
@@ -1037,12 +1071,29 @@ def reply_to_story(story_id):
         return jsonify({'error': 'Story not found'}), 404
     conn.execute('INSERT INTO story_replies (story_id, user_id, message) VALUES (?,?,?)',
                  (story_id, session['user_id'], message))
+    # Send reply as chat message
     if story['user_id'] != session['user_id']:
+        conn.execute('INSERT INTO messages (sender_id, receiver_id, message) VALUES (?,?,?)',
+                     (session['user_id'], story['user_id'], f'📖 Story reply: {message}'))
         create_notification(story['user_id'], session['user_id'], 'story_reply',
                            f'{session["username"]} replied to your story: {message[:50]}', conn)
     conn.commit()
     conn.close()
     return jsonify({'message': 'Reply sent'})
+
+@app.route('/api/stories/<int:story_id>/view', methods=['POST'])
+def view_story(story_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    try:
+        conn.execute('INSERT OR IGNORE INTO story_views (story_id, user_id) VALUES (?,?)',
+                     (story_id, session['user_id']))
+        conn.commit()
+    except:
+        pass
+    conn.close()
+    return jsonify({'message': 'Viewed'})
 
 # ─── REPORTS ───
 
