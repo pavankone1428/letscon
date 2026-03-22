@@ -5,8 +5,15 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import random
 import json
 
+import os
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 app = Flask(__name__)
 app.secret_key = 'refnet-dev-secret-key-2024'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 otp_store = {}
 
