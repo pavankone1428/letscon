@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # LeTsCoN - Local Connection Platform
 
 A location-based social networking platform built with Flask that connects people in their local area.
@@ -111,3 +112,6 @@ http://localhost:5000
 ## License
 
 MIT License
+=======
+# letscon
+>>>>>>> c6d4f79be8fde2444898788c259a45d64fe0ea06
