@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RefNet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    {% if not logged_in %}
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-modal">
+            <div class="login-header">
+                <h2>RefNet</h2>
+                <p class="login-subtitle">Career Networking & Referrals</p>
+            </div>
+            <div class="login-body">
+                <!-- Login Form -->
+                <div id="loginFormSection" class="auth-section">
+                    <div class="form-group">
+                        <label>Email or Username</label>
+                        <input type="text" id="loginEmail" placeholder="Enter email or username" />
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="loginPassword" placeholder="Enter password" />
+                            <button type="button" class="toggle-pw" onclick="togglePw('loginPassword')">👁️</button>
+                        </div>
+                    </div>
+                    <button id="loginBtn" class="btn-primary">LOG IN</button>
+                    <div class="divider"><span>or</span></div>
+                    <p class="switch-text">New here? <a href="#" id="showRegister">Create account</a></p>
+                </div>
+                <!-- Register Form -->
+                <div id="registerFormSection" class="auth-section" style="display:none;">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="regName" placeholder="Your full name" />
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="regEmail" placeholder="your@email.com" />
+                    </div>
+                    <div class="form-group">
+                        <label>Company (Optional)</label>
+                        <input type="text" id="regCompany" placeholder="Current company" />
+                    </div>
+                    <div class="form-group">
+                        <label>Role (Optional)</label>
+                        <input type="text" id="regRole" placeholder="e.g. Software Engineer" />
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="regPassword" placeholder="Min 6 characters" />
+                            <button type="button" class="toggle-pw" onclick="togglePw('regPassword')">👁️</button>
+                        </div>
+                    </div>
+                    <button id="registerBtn" class="btn-primary">CREATE ACCOUNT</button>
+                    <p class="switch-text">Already have an account? <a href="#" id="showLogin">Login</a></p>
+                </div>
+                <div id="authMessage" class="auth-message"></div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="app-container">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <span class="logo">RefNet</span>
+            </div>
+            {% if logged_in %}
+            <nav class="desktop-nav">
+                <button class="nav-item active" data-tab="feed">🏠 Feed</button>
+                <button class="nav-item" data-tab="network">👥 Network</button>
+                <button class="nav-item" data-tab="referrals">🔗 Referrals</button>
+                <button class="nav-item" data-tab="messages">💬 Messages</button>
+                <button class="nav-item" data-tab="insights">🏢 Insights</button>
+                <button class="nav-item" data-tab="profile">👤 Profile</button>
+            </nav>
+            {% endif %}
+            <div class="top-bar-right">
+                {% if logged_in %}
+                <button id="searchToggle" class="icon-btn">🔍</button>
+                <button id="notifBtn" class="icon-btn">🔔 <span id="notifBadge" class="badge" style="display:none;"></span></button>
+                <button id="avatarBtn" class="avatar-btn" title="Menu">
+                    <span class="avatar-letter">{{ username[0]|upper }}</span>
+                </button>
+                {% else %}
+                <button id="openLogin" class="btn-primary btn-sm">Login</button>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Search Overlay -->
+        {% if logged_in %}
+        <div id="searchOverlay" class="search-overlay">
+            <div class="search-bar">
+                <button id="searchBack" class="back-btn">←</button>
+                <input type="text" id="searchInput" placeholder="Search people, skills, companies, posts..." />
+            </div>
+            <div id="searchResults" class="search-results"></div>
+        </div>
+        {% endif %}
+
+        <!-- Main Content -->
+        <main class="content-area">
+            {% if logged_in %}
+
+            <!-- Feed Tab -->
+            <div id="feedTab" class="tab-content active">
+                <!-- Stories -->
+                <div id="storiesBar" class="stories-bar">
+                    <div class="story-item add-story" onclick="openCreateStory()">
+                        <div class="story-avatar add">+</div>
+                        <span class="story-name">Your Story</span>
+                    </div>
+                    <div id="storiesList" class="stories-list"></div>
+                </div>
+                <div class="feed-header">
+                    <h2>Problem-Solution Feed</h2>
+                    <div class="feed-controls">
+                        <select id="feedSort">
+                            <option value="latest">Latest</option>
+                            <option value="trending">Trending</option>
+                            <option value="useful">Most Useful</option>
+                        </select>
+                        <button onclick="openCreatePost()" class="btn-primary btn-sm">+ New Post</button>
+                    </div>
+                </div>
+                <div id="feedList" class="feed-list"></div>
+            </div>
+
+            <!-- Network Tab -->
+            <div id="networkTab" class="tab-content">
+                <div class="network-tabs">
+                    <button class="net-tab active" data-net="people">Discover People</button>
+                    <button class="net-tab" data-net="pending">Pending Requests</button>
+                    <button class="net-tab" data-net="myconnections">My Connections</button>
+                </div>
+                <div id="netPeople" class="net-section active">
+                    <div id="peopleList"></div>
+                </div>
+                <div id="netPending" class="net-section">
+                    <div id="pendingList"></div>
+                </div>
+                <div id="netMyconnections" class="net-section">
+                    <div id="myConnectionsList"></div>
+                </div>
+            </div>
+
+            <!-- Referrals Tab -->
+            <div id="referralsTab" class="tab-content">
+                <div class="referral-tabs">
+                    <button class="ref-tab active" data-ref="browse">Browse Requests</button>
+                    <button class="ref-tab" data-ref="my">My Requests</button>
+                </div>
+                <div id="refBrowse" class="ref-section active">
+                    <div id="referralList" class="referral-list"></div>
+                </div>
+                <div id="refMy" class="ref-section">
+                    <button onclick="openCreateReferral()" class="btn-primary" style="width:100%;margin-bottom:1rem;">+ Request Referral</button>
+                    <div id="myReferralList"></div>
+                </div>
+            </div>
+
+            <!-- Messages Tab -->
+            <div id="messagesTab" class="tab-content">
+                <div id="messagesConvoView">
+                    <h2>Messages</h2>
+                    <div id="conversationList"></div>
+                </div>
+                <div id="messagesChatView" style="display:none;">
+                    <div class="inline-chat-header">
+                        <button class="back-btn" onclick="backToConversations()">←</button>
+                        <div id="chatUserAvatar" class="chat-header-avatar"></div>
+                        <h3 id="inlineChatTitle" style="flex:1;"></h3>
+                        <button class="icon-btn chat-call-btn" onclick="startCall()" title="Voice Call">📞</button>
+                        <button class="icon-btn chat-call-btn" onclick="startVideoCall()" title="Video Call">📹</button>
+                        <button class="icon-btn" onclick="openReportModal('user')" title="Report">⚠️</button>
+                    </div>
+                    <div id="inlineChatMessages" class="inline-chat-messages"></div>
+                    <div id="replyPreview" class="reply-preview" style="display:none;">
+                        <div class="reply-preview-content">
+                            <span class="reply-preview-name" id="replyPreviewName"></span>
+                            <span class="reply-preview-text" id="replyPreviewText"></span>
+                        </div>
+                        <button class="reply-preview-close" onclick="cancelReply()">✕</button>
+                    </div>
+                    <div class="chat-input-bar">
+                        <input type="text" id="inlineChatInput" placeholder="Type a message..." />
+                        <button onclick="sendChatMessage()" class="btn-primary btn-sm">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Tab -->
+            <div id="insightsTab" class="tab-content">
+                <div class="insights-header">
+                    <h2>Company Insights</h2>
+                    <button onclick="openAddReview()" class="btn-primary btn-sm">+ Add Review</button>
+                </div>
+                <div id="reviewsList"></div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div id="notificationsTab" class="tab-content">
+                <h2>Notifications</h2>
+                <div id="notifList"></div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div id="profileTab" class="tab-content">
+                <div id="profileContent"></div>
+            </div>
+
+            {% endif %}
+        </main>
+
+        <!-- Modals -->
+        <!-- Create Post Modal -->
+        <div id="postModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>New Post</h3>
+                    <button class="close-btn" onclick="closeModal('postModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="post-type-selector">
+                        <label class="type-option selected" data-value="problem"><input type="radio" name="postType" value="problem" checked hidden>🔴 Problem</label>
+                        <label class="type-option" data-value="solution"><input type="radio" name="postType" value="solution" hidden>🟢 Solution</label>
+                        <label class="type-option" data-value="discussion"><input type="radio" name="postType" value="discussion" hidden>🔵 Discussion</label>
+                        <label class="type-option" data-value="achievement"><input type="radio" name="postType" value="achievement" hidden>🏆 Achievement</label>
+                    </div>
+                    <input type="text" id="postTitle" placeholder="Title" />
+                    <textarea id="postContent" placeholder="Describe in detail..." rows="5"></textarea>
+                    <input type="text" id="postTags" placeholder="Tags (comma separated): testing, selenium, backend" />
+                    <button onclick="submitPost()" class="btn-primary">Post</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Referral Modal -->
+        <div id="referralModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Request Referral</h3>
+                    <button class="close-btn" onclick="closeModal('referralModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="refCompany" placeholder="Target Company (e.g. Google)" />
+                    <input type="text" id="refRole" placeholder="Target Role (e.g. SDE-2)" />
+                    <input type="text" id="refSkills" placeholder="Skills (comma separated)" />
+                    <textarea id="refDesc" placeholder="Why should someone refer you?" rows="4"></textarea>
+                    <button onclick="submitReferral()" class="btn-primary">Submit Request</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Company Review Modal -->
+        <div id="reviewModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Company Review</h3>
+                    <button class="close-btn" onclick="closeModal('reviewModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="reviewCompany" placeholder="Company Name" />
+                    <input type="text" id="reviewSalary" placeholder="Salary Range (e.g. 10-15 LPA)" />
+                    <div class="rating-group">
+                        <label>Work-Life Balance</label>
+                        <select id="reviewWLB"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
+                    </div>
+                    <div class="rating-group">
+                        <label>Manager Rating</label>
+                        <select id="reviewMgr"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
+                    </div>
+                    <div class="rating-group">
+                        <label>Work Pressure</label>
+                        <select id="reviewPressure"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+                    </div>
+                    <textarea id="reviewText" placeholder="Your experience (anonymous)" rows="4"></textarea>
+                    <button onclick="submitReview()" class="btn-primary">Submit Review</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View User Profile Modal -->
+        <div id="userProfileModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Profile</h3>
+                    <button class="close-btn" onclick="closeModal('userProfileModal')">&times;</button>
+                </div>
+                <div class="modal-body" id="userProfileContent"></div>
+            </div>
+        </div>
+
+        <!-- Comments Modal -->
+        <div id="commentsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Comments</h3>
+                    <button class="close-btn" onclick="closeModal('commentsModal')">&times;</button>
+                </div>
+                <div id="commentsList" class="comments-list"></div>
+                <div class="chat-input">
+                    <input type="text" id="commentInput" placeholder="Add a comment..." />
+                    <button onclick="submitComment()" class="btn-primary btn-sm">Post</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Story Create Modal -->
+        <div id="storyModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create Story</h3>
+                    <button class="close-btn" onclick="closeModal('storyModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <textarea id="storyContent" placeholder="Share a quick update, job opening, or info..." rows="3" maxlength="280"></textarea>
+                    <div id="storyMediaPreview" style="display:none;position:relative;margin-bottom:0.5rem;">
+                        <img id="storyMediaImg" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--radius);" />
+                        <button onclick="removeStoryMedia()" style="position:absolute;top:0.25rem;right:0.25rem;background:rgba(0,0,0,0.5);color:white;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.8rem;">✕</button>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                        <label class="story-media-btn" style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.5rem 0.85rem;border:2px solid var(--border);border-radius:2rem;cursor:pointer;font-size:0.85rem;font-weight:600;color:#555;transition:border-color 0.2s;">
+                            📷 Add Photo/Video
+                            <input type="file" id="storyMediaInput" accept="image/*,video/*" onchange="previewStoryMedia(this)" style="display:none;" />
+                        </label>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+                        <label style="font-size:0.85rem;font-weight:600;color:#666;">Background:</label>
+                        <div class="story-color-picker">
+                            <button class="color-dot selected" data-color="#7c3aed" style="background:#7c3aed;" onclick="pickStoryColor(this)"></button>
+                            <button class="color-dot" data-color="#2563eb" style="background:#2563eb;" onclick="pickStoryColor(this)"></button>
+                            <button class="color-dot" data-color="#dc2626" style="background:#dc2626;" onclick="pickStoryColor(this)"></button>
+                            <button class="color-dot" data-color="#16a34a" style="background:#16a34a;" onclick="pickStoryColor(this)"></button>
+                            <button class="color-dot" data-color="#ea580c" style="background:#ea580c;" onclick="pickStoryColor(this)"></button>
+                            <button class="color-dot" data-color="#1a1a1a" style="background:#1a1a1a;" onclick="pickStoryColor(this)"></button>
+                        </div>
+                    </div>
+                    <button onclick="submitStory()" class="btn-primary">Post Story</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Story Viewer Modal -->
+        <div id="storyViewModal" class="modal">
+            <div class="story-viewer" id="storyViewer">
+                <div class="story-top-bar">
+                    <div class="story-user-info" id="storyViewerHeader"></div>
+                    <div class="story-top-actions">
+                        <div class="story-menu-wrap">
+                            <button class="story-menu-btn" onclick="toggleStoryMenu()">⋯</button>
+                            <div class="story-menu" id="storyMenu">
+                                <button id="storyDeleteBtn" onclick="deleteCurrentStory()" style="display:none;">🗑️ Delete Story</button>
+                                <button onclick="closeModal('storyViewModal')">✕ Close</button>
+                            </div>
+                        </div>
+                        <button class="story-close-btn" onclick="closeModal('storyViewModal')">✕</button>
+                    </div>
+                </div>
+                <div class="story-progress" id="storyProgress"></div>
+                <div class="story-viewer-content" id="storyViewerContent"></div>
+                <div class="story-viewer-nav">
+                    <button onclick="prevStory()">‹</button>
+                    <button onclick="nextStory()">›</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Modal -->
+        <div id="reportModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>⚠️ Report</h3>
+                    <button class="close-btn" onclick="closeModal('reportModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reportType" />
+                    <input type="hidden" id="reportTargetId" />
+                    <div class="form-group">
+                        <label>Reason</label>
+                        <div class="custom-select" id="reportReasonSelect">
+                            <div class="custom-select-trigger" onclick="toggleCustomSelect('reportReasonSelect')">
+                                <span id="reportReasonLabel">Spam</span>
+                                <span class="custom-select-arrow">▾</span>
+                            </div>
+                            <div class="custom-select-options">
+                                <div class="custom-select-option selected" data-value="spam" onclick="pickReportReason(this)">Spam</div>
+                                <div class="custom-select-option" data-value="harassment" onclick="pickReportReason(this)">Harassment</div>
+                                <div class="custom-select-option" data-value="fake_content" onclick="pickReportReason(this)">Fake Content</div>
+                                <div class="custom-select-option" data-value="fraud" onclick="pickReportReason(this)">Fraud / Scam</div>
+                                <div class="custom-select-option" data-value="inappropriate" onclick="pickReportReason(this)">Inappropriate Content</div>
+                                <div class="custom-select-option" data-value="impersonation" onclick="pickReportReason(this)">Impersonation</div>
+                                <div class="custom-select-option" data-value="other" onclick="pickReportReason(this)">Other</div>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="reportDetails" placeholder="Provide additional details..." rows="3"></textarea>
+                    <button onclick="submitReport()" class="btn-primary btn-danger">Submit Report</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Sidebar -->
+        {% if logged_in %}
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+        <aside id="profileSidebar" class="profile-sidebar">
+            <div class="sidebar-header">
+                <h2>{{ username }}</h2>
+                <button id="closeSidebar" class="close-btn">&times;</button>
+            </div>
+            <div class="sidebar-menu">
+                <a href="#" onclick="goTab('profile')">👤 My Profile</a>
+                <a href="#" onclick="goTab('referrals')">🔗 My Referrals</a>
+                <a href="#" onclick="goTab('messages')">💬 Messages</a>
+                <a href="#" onclick="goTab('notifications')">🔔 Notifications</a>
+                <a href="#" onclick="goTab('insights')">🏢 Company Insights</a>
+                <hr>
+                <div class="switch-accounts-section">
+                    <div class="switch-label">🔄 Switch Account</div>
+                    <div id="accountSwitcherList" class="account-switcher-list"></div>
+                </div>
+                <hr>
+                <a href="#" onclick="confirmLogout()">🚪 Logout</a>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Bottom Nav (mobile) -->
+        {% if logged_in %}
+        <nav class="bottom-nav">
+            <button class="bnav-item active" data-tab="feed"><span class="bnav-icon">🏠</span><span class="bnav-label">Feed</span></button>
+            <button class="bnav-item" data-tab="network"><span class="bnav-icon">👥</span><span class="bnav-label">Network</span></button>
+            <button class="bnav-item" data-tab="referrals"><span class="bnav-icon">🔗</span><span class="bnav-label">Referrals</span></button>
+            <button class="bnav-item" data-tab="messages"><span class="bnav-icon">💬</span><span class="bnav-label">Messages</span></button>
+            <button class="bnav-item" data-tab="profile"><span class="bnav-icon">👤</span><span class="bnav-label">Profile</span></button>
+        </nav>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
