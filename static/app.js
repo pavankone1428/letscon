@@ -56,6 +56,8 @@ function initApp() {
     if (chatInput) chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage(); });
     const commentInput = document.getElementById('commentInput');
     if (commentInput) commentInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitComment(); });
+    const storyReplyInput = document.getElementById('storyReplyInput');
+    if (storyReplyInput) storyReplyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendStoryReply(); });
 
     // Close emoji picker on outside click
     document.addEventListener('click', (e) => {
@@ -238,7 +240,8 @@ function sharePost(postId, title) {
 }
 
 async function deletePost(postId) {
-    if (!confirm('Delete this post? This cannot be undone.')) return;
+    const ok = await customConfirm('Delete this post? This cannot be undone.');
+    if (!ok) return;
     try {
         const res = await fetch(`/api/posts/${postId}`, { method:'DELETE' });
         const data = await res.json();
@@ -253,14 +256,15 @@ function togglePostMenu(postId) {
 }
 
 async function deleteStory(storyId) {
-    if (!confirm('Delete this story?')) return;
+    const ok = await customConfirm('Delete this story?');
+    if (!ok) return;
     try {
         const res = await fetch(`/api/stories/${storyId}`, { method:'DELETE' });
         if (res.ok) {
             closeModal('storyViewModal');
             loadStories();
-        } else { alert('Failed to delete story'); }
-    } catch { alert('Failed to delete story'); }
+        } else { showToast('Failed to delete story'); }
+    } catch { showToast('Failed to delete story'); }
 }
 
 function openCreatePost() {
@@ -1168,19 +1172,69 @@ function showStorySlide() {
     document.getElementById('storyViewer').style.background = s.media_url ? '#000' : (s.bg_color || '#7c3aed');
     const deleteBtn = document.getElementById('storyDeleteBtn');
     if (deleteBtn) deleteBtn.style.display = s.is_own ? 'block' : 'none';
+    // Reactions display
+    const reactionsDisplay = document.getElementById('storyReactionsDisplay');
+    if (s.reactions && Object.keys(s.reactions).length > 0) {
+        reactionsDisplay.innerHTML = Object.entries(s.reactions).map(([r, c]) => `${r} ${c}`).join('  ');
+    } else {
+        reactionsDisplay.innerHTML = '';
+    }
+    // Highlight user's reaction
+    document.querySelectorAll('.story-emoji-bar button').forEach(btn => btn.classList.remove('active-reaction'));
+    if (s.user_reaction) {
+        document.querySelectorAll('.story-emoji-bar button').forEach(btn => {
+            if (btn.textContent.trim() === s.user_reaction) btn.classList.add('active-reaction');
+        });
+    }
     let contentHtml = '';
     if (s.media_url) {
         if (s.media_url.startsWith('data:video/')) {
-            contentHtml = `<video src="${s.media_url}" style="max-width:100%;max-height:60vh;border-radius:0.5rem;" controls autoplay muted></video>`;
+            contentHtml = `<video src="${s.media_url}" style="max-width:100%;max-height:50vh;border-radius:0.5rem;" controls autoplay muted></video>`;
         } else {
-            contentHtml = `<img src="${s.media_url}" style="max-width:100%;max-height:60vh;border-radius:0.5rem;object-fit:contain;" />`;
+            contentHtml = `<img src="${s.media_url}" style="max-width:100%;max-height:50vh;border-radius:0.5rem;object-fit:contain;" />`;
         }
         if (s.content) contentHtml += `<p style="margin-top:0.75rem;font-size:1rem;">${esc(s.content)}</p>`;
     } else {
         contentHtml = `<p>${esc(s.content)}</p>`;
     }
     document.getElementById('storyViewerContent').innerHTML = contentHtml;
+    document.getElementById('storyReplyInput').value = '';
     closeStoryMenu();
+}
+
+async function reactToStory(emoji) {
+    const s = storyViewData[storyViewIndex];
+    if (!s) return;
+    await fetch(`/api/stories/${s.id}/react`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reaction: emoji}) });
+    // Refresh story data
+    const res = await fetch('/api/stories');
+    const groups = await res.json();
+    const group = groups.find(g => g.stories.some(st => st.id === s.id));
+    if (group) {
+        storyViewData = group.stories;
+        showStorySlide();
+    }
+}
+
+async function sendStoryReply() {
+    const s = storyViewData[storyViewIndex];
+    if (!s) return;
+    const input = document.getElementById('storyReplyInput');
+    const message = input.value.trim();
+    if (!message) return;
+    const res = await fetch(`/api/stories/${s.id}/reply`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message}) });
+    if (res.ok) {
+        input.value = '';
+        showToast('Reply sent!');
+    }
+}
+
+function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#333;color:white;padding:0.6rem 1.2rem;border-radius:2rem;font-size:0.85rem;z-index:99999;animation:fadeIn 0.2s ease;';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2000);
 }
 
 function toggleStoryMenu() {
@@ -1288,6 +1342,23 @@ async function quickSwitch(userId) {
     } catch (e) { alert('Switch failed: ' + e.message); }
 }
 
+// ─── CUSTOM CONFIRM DIALOG ───
+let confirmResolve = null;
+function customConfirm(msg) {
+    return new Promise(resolve => {
+        confirmResolve = resolve;
+        document.getElementById('confirmDialogMsg').textContent = msg;
+        document.getElementById('confirmDialog').classList.add('open');
+    });
+}
+function resolveConfirm(val) {
+    document.getElementById('confirmDialog').classList.remove('open');
+    if (confirmResolve) { confirmResolve(val); confirmResolve = null; }
+}
+
 // ─── UTILS ───
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-function confirmLogout() { if (confirm('Logout?')) { fetch('/api/logout', {method:'POST'}).then(() => location.href = '/'); } }
+async function confirmLogout() {
+    const ok = await customConfirm('Logout?');
+    if (ok) { fetch('/api/logout', {method:'POST'}).then(() => location.href = '/'); }
+}

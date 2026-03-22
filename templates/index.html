@@ -372,6 +372,23 @@
                     <button onclick="prevStory()">‹</button>
                     <button onclick="nextStory()">›</button>
                 </div>
+                <div class="story-bottom-bar">
+                    <div class="story-reactions-row" id="storyReactionsDisplay"></div>
+                    <div class="story-interact-row">
+                        <div class="story-emoji-bar">
+                            <button onclick="reactToStory('❤️')">❤️</button>
+                            <button onclick="reactToStory('😂')">😂</button>
+                            <button onclick="reactToStory('😮')">😮</button>
+                            <button onclick="reactToStory('🔥')">🔥</button>
+                            <button onclick="reactToStory('👏')">👏</button>
+                            <button onclick="reactToStory('😢')">😢</button>
+                        </div>
+                        <div class="story-reply-bar">
+                            <input type="text" id="storyReplyInput" placeholder="Reply to story..." />
+                            <button onclick="sendStoryReply()">➤</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -444,6 +461,19 @@
             <button class="bnav-item" data-tab="profile"><span class="bnav-icon">👤</span><span class="bnav-label">Profile</span></button>
         </nav>
         {% endif %}
+    </div>
+
+    <!-- Custom Confirm Dialog -->
+    <div id="confirmDialog" class="modal">
+        <div class="modal-content" style="max-width:340px;">
+            <div class="modal-body" style="text-align:center;padding:2rem;">
+                <p id="confirmDialogMsg" style="font-size:1.05rem;font-weight:600;margin-bottom:1.5rem;"></p>
+                <div style="display:flex;gap:0.75rem;">
+                    <button id="confirmDialogCancel" class="btn-outline" style="flex:1;" onclick="resolveConfirm(false)">Cancel</button>
+                    <button id="confirmDialogOk" class="btn-primary btn-danger" style="flex:1;" onclick="resolveConfirm(true)">Confirm</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='auth.js') }}"></script>
