@@ -278,6 +278,60 @@ def init_db():
                       (email, username, generate_password_hash(pw), company, role, skills))
 
     conn.commit()
+
+    # Seed static data if DB is fresh (no posts exist)
+    has_posts = c.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
+    if has_posts == 0:
+        naruto = c.execute('SELECT id FROM users WHERE email=?', ('naruto@leafvillage.com',)).fetchone()
+        sasuke = c.execute('SELECT id FROM users WHERE email=?', ('sasuke@leafvillage.com',)).fetchone()
+        if naruto and sasuke:
+            nid, sid = naruto[0], sasuke[0]
+
+            # Make them connected
+            c.execute('INSERT INTO connections (sender_id, receiver_id, status) VALUES (?,?,?)', (nid, sid, 'accepted'))
+
+            # Seed posts
+            seed_posts = [
+                (nid, 'achievement', 'Became Hokage!', 'Finally achieved my dream of becoming Hokage. Never give up on your dreams, believe it!', 'leadership,goals,motivation'),
+                (sid, 'discussion', 'Best practices for ANBU operations', 'What security frameworks do you use for covert missions? Looking for recommendations on stealth protocols and encrypted communications.', 'security,strategy,operations'),
+                (nid, 'problem', 'Shadow Clone Jutsu causing memory leaks', 'When I create too many shadow clones, the system runs out of memory. Anyone faced similar scaling issues?', 'scaling,performance,debugging'),
+                (sid, 'solution', 'Sharingan-based code review technique', 'I developed a method to review code 10x faster using pattern recognition. Here is how it works: focus on the data flow first, then check edge cases.', 'code-review,productivity,tips'),
+                (nid, 'discussion', 'Team building activities for remote ninjas', 'Our team is distributed across different villages. What activities help build team spirit when everyone is remote?', 'remote-work,team,culture'),
+                (sid, 'achievement', 'Completed S-rank security audit', 'Successfully completed a full security audit of the village network. Zero critical vulnerabilities found after our patches.', 'security,audit,milestone'),
+            ]
+            for uid, ptype, title, content, tags in seed_posts:
+                c.execute('INSERT INTO posts (user_id, type, title, content, tags) VALUES (?,?,?,?,?)',
+                          (uid, ptype, title, content, tags))
+
+            # Seed stories
+            seed_stories = [
+                (nid, 'Ramen break! Best way to recharge after a long coding session 🍜', '#7c3aed'),
+                (sid, 'Just deployed a new security patch. Stay safe out there.', '#1a1a1a'),
+                (nid, 'Looking for React developers for a new village project. DM me!', '#2563eb'),
+                (sid, 'Training session at 6 AM tomorrow. Who is in?', '#dc2626'),
+            ]
+            for uid, content, color in seed_stories:
+                c.execute('INSERT INTO stories (user_id, content, type, bg_color, expires_at) VALUES (?,?,?,?,datetime("now","+24 hours"))',
+                          (uid, content, 'text', color))
+
+            # Seed some comments
+            posts = c.execute('SELECT id, user_id FROM posts').fetchall()
+            seed_comments = [
+                (posts[0][0], sid, 'Congratulations Naruto! Well deserved!'),
+                (posts[1][0], nid, 'I recommend using encrypted scroll protocols. Works great for our team.'),
+                (posts[2][0], sid, 'Try limiting clone count to 1000. Use a queue system for the rest.'),
+                (posts[3][0], nid, 'This is amazing! Will try this in our next sprint review.'),
+            ]
+            for post_id, uid, content in seed_comments:
+                c.execute('INSERT INTO comments (post_id, user_id, content) VALUES (?,?,?)', (post_id, uid, content))
+
+            # Seed a company review
+            c.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
+                      (nid, 'Leaf Village', '80-120K', 4, 5, 'medium', 'Great place to work. The Hokage really cares about work-life balance. Free ramen on Fridays!', 1))
+            c.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
+                      (sid, 'Leaf Village', '90-130K', 3, 4, 'high', 'Challenging missions but great learning opportunities. ANBU division has intense work pressure though.', 1))
+
+            conn.commit()
     conn.close()
 
 init_db()
