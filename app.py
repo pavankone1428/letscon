@@ -82,9 +82,21 @@ def init_db():
         post_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
         content TEXT NOT NULL,
+        parent_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (post_id) REFERENCES posts(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS comment_votes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        comment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        vote INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (comment_id) REFERENCES comments(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(comment_id, user_id)
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS post_votes (
@@ -247,6 +259,10 @@ def init_db():
             pass
     try:
         c.execute("ALTER TABLE stories ADD COLUMN media_url TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER")
     except sqlite3.OperationalError:
         pass
 
@@ -851,8 +867,23 @@ def get_comments(post_id):
     comments = conn.execute('''SELECT c.*, u.username, u.company
                                FROM comments c JOIN users u ON c.user_id=u.id
                                WHERE c.post_id=? ORDER BY c.created_at ASC''', (post_id,)).fetchall()
+    result = []
+    for c in comments:
+        cd = dict(c)
+        cd['is_own'] = bool(c['user_id'] == session['user_id'])
+        likes = conn.execute('SELECT COUNT(*) as cnt FROM comment_votes WHERE comment_id=? AND vote=1', (c['id'],)).fetchone()['cnt']
+        dislikes = conn.execute('SELECT COUNT(*) as cnt FROM comment_votes WHERE comment_id=? AND vote=-1', (c['id'],)).fetchone()['cnt']
+        user_vote = conn.execute('SELECT vote FROM comment_votes WHERE comment_id=? AND user_id=?', (c['id'], session['user_id'])).fetchone()
+        cd['likes'] = likes
+        cd['dislikes'] = dislikes
+        cd['user_vote'] = user_vote['vote'] if user_vote else 0
+        # Get reply info
+        if c['parent_id']:
+            parent = conn.execute('SELECT u.username FROM comments cm JOIN users u ON cm.user_id=u.id WHERE cm.id=?', (c['parent_id'],)).fetchone()
+            cd['reply_to_username'] = parent['username'] if parent else None
+        result.append(cd)
     conn.close()
-    return jsonify([dict(c) for c in comments])
+    return jsonify(result)
 
 @app.route('/api/posts/<int:post_id>/comments', methods=['POST'])
 def add_comment(post_id):
@@ -862,10 +893,9 @@ def add_comment(post_id):
     if not data.get('content'):
         return jsonify({'error': 'Comment cannot be empty'}), 400
     conn = get_db()
-    conn.execute('INSERT INTO comments (post_id, user_id, content) VALUES (?,?,?)',
-                 (post_id, session['user_id'], data['content']))
+    conn.execute('INSERT INTO comments (post_id, user_id, content, parent_id) VALUES (?,?,?,?)',
+                 (post_id, session['user_id'], data['content'], data.get('parent_id')))
     conn.commit()
-    # Notify post owner
     post = conn.execute('SELECT user_id, title FROM posts WHERE id=?', (post_id,)).fetchone()
     if post and post['user_id'] != session['user_id']:
         create_notification(post['user_id'], session['user_id'], 'comment',
@@ -873,6 +903,43 @@ def add_comment(post_id):
     conn.commit()
     conn.close()
     return jsonify({'message': 'Comment added'}), 201
+
+@app.route('/api/comments/<int:comment_id>/vote', methods=['POST'])
+def vote_comment(comment_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    vote = data.get('vote', 1)
+    conn = get_db()
+    existing = conn.execute('SELECT id, vote FROM comment_votes WHERE comment_id=? AND user_id=?',
+                            (comment_id, session['user_id'])).fetchone()
+    if existing:
+        if existing['vote'] == vote:
+            conn.execute('DELETE FROM comment_votes WHERE id=?', (existing['id'],))
+        else:
+            conn.execute('UPDATE comment_votes SET vote=? WHERE id=?', (vote, existing['id']))
+    else:
+        conn.execute('INSERT INTO comment_votes (comment_id, user_id, vote) VALUES (?,?,?)',
+                     (comment_id, session['user_id'], vote))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Voted'})
+
+@app.route('/api/comments/<int:comment_id>', methods=['DELETE'])
+def delete_comment(comment_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    comment = conn.execute('SELECT * FROM comments WHERE id=? AND user_id=?', (comment_id, session['user_id'])).fetchone()
+    if not comment:
+        conn.close()
+        return jsonify({'error': 'Comment not found or not yours'}), 404
+    conn.execute('DELETE FROM comment_votes WHERE comment_id=?', (comment_id,))
+    conn.execute('DELETE FROM comments WHERE parent_id=?', (comment_id,))
+    conn.execute('DELETE FROM comments WHERE id=?', (comment_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Comment deleted'})
 
 # ─── MESSAGES ───
 
