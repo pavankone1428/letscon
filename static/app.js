@@ -6,6 +6,24 @@ let emojiPickerTimeout = null;
 // ─── INIT ───
 document.addEventListener('DOMContentLoaded', initApp);
 
+// ─── THEME ───
+function initTheme() {
+    const saved = localStorage.getItem('refnet-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    updateThemeDots(saved);
+}
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('refnet-theme', theme);
+    updateThemeDots(theme);
+}
+function updateThemeDots(theme) {
+    document.querySelectorAll('.theme-dot').forEach(d => {
+        d.classList.toggle('active-theme', d.dataset.theme === theme);
+    });
+}
+initTheme();
+
 function initApp() {
     document.querySelectorAll('.nav-item').forEach(b => b.addEventListener('click', () => switchTab(b, 'desktop')));
     document.querySelectorAll('.bnav-item').forEach(b => b.addEventListener('click', () => switchTab(b, 'mobile')));
