@@ -161,13 +161,20 @@ async function loadFeed() {
                 ${p.tags ? `<div class="post-tags">${p.tags.split(',').map(t => `<span class="tag">#${t.trim()}</span>`).join('')}</div>` : ''}
                 ${reactionSummary ? `<div class="reaction-summary">${reactionSummary}</div>` : ''}
                 <div class="post-actions-bar">
-                    <button class="post-action-btn like-btn ${p.user_vote === 1 ? 'active' : ''}" onclick="vote(${p.id}, 1, '${userReaction}')" oncontextmenu="showEmojiPicker(event, ${p.id})" ontouchstart="startLongPress(event, ${p.id})" ontouchend="cancelLongPress()">
-                        ${p.user_vote === 1 ? getReactionEmoji(userReaction) : '👍'} Like ${totalLikes > 0 ? totalLikes : ''}
+                    <button class="post-action-btn like-btn ${p.user_vote === 1 ? 'liked' : ''}" onclick="vote(${p.id}, 1, '${userReaction}')" oncontextmenu="showEmojiPicker(event, ${p.id})" ontouchstart="startLongPress(event, ${p.id})" ontouchend="cancelLongPress()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                        Like ${totalLikes > 0 ? totalLikes : ''}
                     </button>
-                    <button class="post-action-btn ${p.user_vote === -1 ? 'active-dislike' : ''}" onclick="vote(${p.id}, -1)">👎</button>
-                    <button class="post-action-btn" onclick="openComments(${p.id})">💬 ${p.comment_count || ''}</button>
-                    <button class="post-action-btn ${p.user_bookmarked ? 'active-bookmark' : ''}" onclick="bookmark(${p.id})">🔖</button>
-                    <button class="post-action-btn" onclick="sharePost(${p.id}, '${esc(p.title)}')">🔗</button>
+                    <button class="post-action-btn ${p.user_vote === -1 ? 'disliked' : ''}" onclick="vote(${p.id}, -1)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 15V19a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                    </button>
+                    <button class="post-action-btn" onclick="openComments(${p.id})">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        ${p.comment_count ? p.comment_count + ' Comments' : 'Comment'}
+                    </button>
+                    <button class="post-action-btn" onclick="sharePost(${p.id}, '${esc(p.title)}')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    </button>
                     <div class="post-more-wrap">
                         <button class="post-action-btn" onclick="togglePostMenu(${p.id})">⋯</button>
                         <div class="post-menu" id="postMenu-${p.id}">

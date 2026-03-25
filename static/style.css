@@ -229,11 +229,14 @@ button { font-family:inherit; }
     background:none; border:none; padding:0.5rem 0.6rem; cursor:pointer;
     font-size:0.85rem; color:var(--text-secondary); border-radius:var(--radius);
     transition:all 0.15s; flex:1; text-align:center; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center; gap:0.3rem;
 }
+.post-action-btn svg { vertical-align:middle; flex-shrink:0; }
 .post-action-btn:hover { background:#f0f0f0; color:var(--primary); }
-.post-action-btn.active { color:#7c3aed; font-weight:600; }
-.post-action-btn.active-dislike { color:#dc2626; font-weight:600; }
-.post-action-btn.active-bookmark { color:#f59e0b; font-weight:600; }
+.post-action-btn.liked { color:#2563eb; }
+.post-action-btn.liked svg { stroke:#2563eb; fill:#2563eb; fill-opacity:0.15; }
+.post-action-btn.disliked { color:#dc2626; }
+.post-action-btn.disliked svg { stroke:#dc2626; fill:#dc2626; fill-opacity:0.15; }
 
 /* Emoji Picker */
 .emoji-picker {
