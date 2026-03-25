@@ -340,30 +340,58 @@ async function loadComments(postId) {
     list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">Loading...</p>';
     const res = await fetch(`/api/posts/${postId}/comments`);
     const comments = await res.json();
-    document.getElementById('commentsTitle').textContent = `Comments (${comments.length})`;
-    if (comments.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">No comments yet. Be the first!</p>'; return; }
-    list.innerHTML = comments.map(c => {
-        const letter = (c.username || 'U')[0].toUpperCase();
-        return `
-        <div class="comment-item" id="comment-${c.id}">
-            <div class="comment-top">
-                <div class="comment-avatar">${letter}</div>
-                <div class="comment-meta">
-                    <span class="comment-author">${esc(c.username)}</span>
-                    <span class="comment-company">${c.company ? ' · ' + esc(c.company) : ''}</span>
-                    ${c.reply_to_username ? `<span class="comment-reply-tag">↩ ${esc(c.reply_to_username)}</span>` : ''}
-                </div>
-                <span class="comment-time">${timeAgo(c.created_at)}</span>
+    // Separate parents and replies
+    const parents = comments.filter(c => !c.parent_id);
+    const replies = {};
+    comments.filter(c => c.parent_id).forEach(c => {
+        if (!replies[c.parent_id]) replies[c.parent_id] = [];
+        replies[c.parent_id].push(c);
+    });
+    document.getElementById('commentsTitle').textContent = `Comments (${parents.length})`;
+    if (parents.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">No comments yet. Be the first!</p>'; return; }
+    list.innerHTML = parents.map(c => {
+        const childReplies = replies[c.id] || [];
+        return renderComment(c) + (childReplies.length > 0 ? `
+            <div class="replies-toggle" onclick="toggleReplies(${c.id}, this)">
+                <span>▸ View ${childReplies.length} ${childReplies.length === 1 ? 'reply' : 'replies'}</span>
             </div>
-            <div class="comment-text">${esc(c.content)}</div>
-            <div class="comment-actions">
-                <button class="comment-action-btn ${c.user_vote === 1 ? 'c-liked' : ''}" onclick="voteComment(${c.id}, 1)">👍 ${c.likes || ''}</button>
-                <button class="comment-action-btn ${c.user_vote === -1 ? 'c-disliked' : ''}" onclick="voteComment(${c.id}, -1)">👎 ${c.dislikes || ''}</button>
-                <button class="comment-action-btn" onclick="replyToComment(${c.id}, '${esc(c.username)}')">↩ Reply</button>
-                ${c.is_own ? `<button class="comment-action-btn comment-delete-btn" onclick="deleteComment(${c.id})">🗑️</button>` : ''}
-            </div>
-        </div>`;
+            <div class="replies-list" id="replies-${c.id}" style="display:none;">
+                ${childReplies.map(r => renderComment(r, true)).join('')}
+            </div>` : '');
     }).join('');
+}
+
+function renderComment(c, isReply) {
+    const letter = (c.username || 'U')[0].toUpperCase();
+    return `
+    <div class="comment-item ${isReply ? 'comment-reply' : ''}" id="comment-${c.id}">
+        <div class="comment-top">
+            <div class="comment-avatar">${letter}</div>
+            <div class="comment-meta">
+                <span class="comment-author">${esc(c.username)}</span>
+                <span class="comment-company">${c.company ? ' · ' + esc(c.company) : ''}</span>
+            </div>
+            <span class="comment-time">${timeAgo(c.created_at)}</span>
+        </div>
+        <div class="comment-text">${esc(c.content)}</div>
+        <div class="comment-actions">
+            <button class="comment-action-btn ${c.user_vote === 1 ? 'c-liked' : ''}" onclick="voteComment(${c.id}, 1)">👍 ${c.likes || ''}</button>
+            <button class="comment-action-btn ${c.user_vote === -1 ? 'c-disliked' : ''}" onclick="voteComment(${c.id}, -1)">👎 ${c.dislikes || ''}</button>
+            <button class="comment-action-btn" onclick="replyToComment(${c.id}, '${esc(c.username)}')">↩ Reply</button>
+            ${c.is_own ? `<button class="comment-action-btn comment-delete-btn" onclick="deleteComment(${c.id})">🗑️</button>` : ''}
+        </div>
+    </div>`;
+}
+
+function toggleReplies(commentId, btn) {
+    const repliesList = document.getElementById('replies-' + commentId);
+    if (repliesList.style.display === 'none') {
+        repliesList.style.display = 'block';
+        btn.querySelector('span').textContent = btn.querySelector('span').textContent.replace('▸ View', '▾ Hide');
+    } else {
+        repliesList.style.display = 'none';
+        btn.querySelector('span').textContent = btn.querySelector('span').textContent.replace('▾ Hide', '▸ View');
+    }
 }
 
 async function voteComment(commentId, vote) {
