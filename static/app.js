@@ -67,8 +67,8 @@ function initApp() {
         if (!e.target.closest('.custom-select')) {
             document.querySelectorAll('.custom-select.open').forEach(s => s.classList.remove('open'));
         }
-        if (!e.target.closest('.post-more-btn')) {
-            document.querySelectorAll('.post-menu').forEach(m => m.style.display = 'none');
+        if (!e.target.closest('.post-more-wrap')) {
+            document.querySelectorAll('.post-menu').forEach(m => m.classList.remove('open'));
         }
     });
 
@@ -164,16 +164,16 @@ async function loadFeed() {
                     <button class="post-action-btn like-btn ${p.user_vote === 1 ? 'active' : ''}" onclick="vote(${p.id}, 1, '${userReaction}')" oncontextmenu="showEmojiPicker(event, ${p.id})" ontouchstart="startLongPress(event, ${p.id})" ontouchend="cancelLongPress()">
                         ${p.user_vote === 1 ? getReactionEmoji(userReaction) : '👍'} Like ${totalLikes > 0 ? totalLikes : ''}
                     </button>
-                    <button class="post-action-btn ${p.user_vote === -1 ? 'active-dislike' : ''}" onclick="vote(${p.id}, -1)">👎 Dislike</button>
+                    <button class="post-action-btn ${p.user_vote === -1 ? 'active-dislike' : ''}" onclick="vote(${p.id}, -1)">👎</button>
                     <button class="post-action-btn" onclick="openComments(${p.id})">💬 ${p.comment_count || ''}</button>
                     <button class="post-action-btn ${p.user_bookmarked ? 'active-bookmark' : ''}" onclick="bookmark(${p.id})">🔖</button>
                     <button class="post-action-btn" onclick="sharePost(${p.id}, '${esc(p.title)}')">🔗</button>
-                    <button class="post-action-btn post-more-btn" onclick="togglePostMenu(${p.id})">⋯
+                    <div class="post-more-wrap">
+                        <button class="post-action-btn" onclick="togglePostMenu(${p.id})">⋯</button>
                         <div class="post-menu" id="postMenu-${p.id}">
-                            ${p.is_own ? `<button onclick="event.stopPropagation();deletePost(${p.id})">🗑️ Delete</button>` : ''}
-                            <button onclick="event.stopPropagation();openReportModal('post', ${p.id})">⚠️ Report</button>
+                            ${p.is_own ? `<button onclick="event.stopPropagation();deletePost(${p.id})">🗑️ Delete</button>` : `<button onclick="event.stopPropagation();openReportModal('post', ${p.id})">⚠️ Report</button>`}
                         </div>
-                    </button>
+                    </div>
                 </div>
             </div>`;
         }).join('');
@@ -251,8 +251,8 @@ async function deletePost(postId) {
 
 function togglePostMenu(postId) {
     const menu = document.getElementById('postMenu-' + postId);
-    document.querySelectorAll('.post-menu').forEach(m => { if (m !== menu) m.style.display = 'none'; });
-    menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+    document.querySelectorAll('.post-menu').forEach(m => { if (m !== menu) m.classList.remove('open'); });
+    menu.classList.toggle('open');
 }
 
 async function deleteStory(storyId) {

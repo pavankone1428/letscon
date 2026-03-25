@@ -199,19 +199,20 @@ button { font-family:inherit; }
 .post-delete-btn:hover { opacity:1; background:#fee2e2; }
 
 /* Post 3-dot menu */
-.post-more-btn { position:relative; }
+.post-more-wrap { position:relative; flex:1; text-align:center; }
 .post-menu {
     display:none; flex-direction:column; position:absolute; bottom:100%; right:0; z-index:20;
     background:white; border:1px solid var(--border); border-radius:var(--radius);
     box-shadow:0 4px 12px rgba(0,0,0,0.15); min-width:130px; overflow:hidden;
 }
+.post-menu.open { display:flex; }
 .post-menu button {
     background:none; border:none; padding:0.6rem 0.85rem; text-align:left;
     font-size:0.85rem; cursor:pointer; transition:background 0.15s; white-space:nowrap;
 }
 .post-menu button:hover { background:#f5f3ff; }
-.post-card h3 { font-size:1.1rem; margin-bottom:0.5rem; }
-.post-card .post-body { color:var(--text-secondary); font-size:0.95rem; margin-bottom:0.75rem; line-height:1.5; }
+.post-card h3 { font-size:1.1rem; margin-bottom:0.5rem; word-break:break-word; }
+.post-card .post-body { color:var(--text-secondary); font-size:0.95rem; margin-bottom:0.75rem; line-height:1.5; word-break:break-word; overflow-wrap:break-word; }
 .post-tags { display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.75rem; }
 .tag { background:#f0f0f0; color:var(--text-secondary); padding:0.2rem 0.6rem; border-radius:1rem; font-size:0.75rem; font-weight:600; }
 
@@ -431,15 +432,20 @@ button { font-family:inherit; }
     .bottom-nav {
         display:flex; position:fixed; bottom:0; left:0; right:0;
         background:#1a1a1a; justify-content:space-around; align-items:center;
-        padding:0.5rem 0; z-index:1000; border-top:1px solid #333;
+        padding:0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom, 0px)) 0;
+        z-index:1000; border-top:1px solid #333;
     }
     .bnav-item {
         display:flex; flex-direction:column; align-items:center; gap:0.1rem;
         background:none; border:none; padding:0.3rem 0.5rem; cursor:pointer;
-        color:#888; font-weight:500; transition:color 0.2s;
+        color:#888; font-weight:500; transition:color 0.2s; position:relative;
     }
     .bnav-item:hover { color:white; background:none; }
-    .bnav-item.active { color:white; border-top:2px solid white; background:none; }
+    .bnav-item.active { color:white; background:none; }
+    .bnav-item.active::after {
+        content:''; position:absolute; bottom:-0.3rem; left:50%; transform:translateX(-50%);
+        width:20px; height:2px; background:white; border-radius:1px;
+    }
     .bnav-icon { font-size:1.3rem; }
     .bnav-label { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.3px; }
     .app-container { padding-bottom:65px; }
