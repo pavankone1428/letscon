@@ -338,17 +338,17 @@ function closeCommentsSheet() {
 async function loadComments(postId) {
     const list = document.getElementById('commentsList');
     list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">Loading...</p>';
-    const res = await fetch(`/api/posts/${postId}/comments`);
-    const comments = await res.json();
-    // Separate parents and replies
-    const parents = comments.filter(c => !c.parent_id);
-    const replies = {};
-    comments.filter(c => c.parent_id).forEach(c => {
-        if (!replies[c.parent_id]) replies[c.parent_id] = [];
-        replies[c.parent_id].push(c);
-    });
-    document.getElementById('commentsTitle').textContent = `Comments (${parents.length})`;
-    if (parents.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">No comments yet. Be the first!</p>'; return; }
+    try {
+        const res = await fetch(`/api/posts/${postId}/comments`);
+        const comments = await res.json();
+        const parents = comments.filter(c => !c.parent_id);
+        const replies = {};
+        comments.filter(c => c.parent_id).forEach(c => {
+            if (!replies[c.parent_id]) replies[c.parent_id] = [];
+            replies[c.parent_id].push(c);
+        });
+        document.getElementById('commentsTitle').textContent = `Comments (${comments.length})`;
+        if (comments.length === 0 || parents.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:2rem;">No comments yet. Be the first! 💬</p>'; return; }
     list.innerHTML = parents.map(c => {
         const childReplies = replies[c.id] || [];
         return renderComment(c) + (childReplies.length > 0 ? `
@@ -359,6 +359,7 @@ async function loadComments(postId) {
                 ${childReplies.map(r => renderComment(r, true)).join('')}
             </div>` : '');
     }).join('');
+    } catch { list.innerHTML = '<p style="text-align:center;color:#999;padding:2rem;">No comments yet. Be the first! 💬</p>'; }
 }
 
 function renderComment(c, isReply) {
