@@ -263,18 +263,16 @@
                         </div>
                     </div>
                     <div id="chatEmojiPicker" class="chat-emoji-picker" style="display:none;">
-                        <div class="chat-emoji-grid">
-                            <button onclick="insertChatEmoji('😊')">😊</button><button onclick="insertChatEmoji('😂')">😂</button>
-                            <button onclick="insertChatEmoji('❤️')">❤️</button><button onclick="insertChatEmoji('👍')">👍</button>
-                            <button onclick="insertChatEmoji('🔥')">🔥</button><button onclick="insertChatEmoji('😮')">😮</button>
-                            <button onclick="insertChatEmoji('😢')">😢</button><button onclick="insertChatEmoji('🎉')">🎉</button>
-                            <button onclick="insertChatEmoji('💯')">💯</button><button onclick="insertChatEmoji('🙏')">🙏</button>
-                            <button onclick="insertChatEmoji('👏')">👏</button><button onclick="insertChatEmoji('🤔')">🤔</button>
-                            <button onclick="insertChatEmoji('😎')">😎</button><button onclick="insertChatEmoji('🥳')">🥳</button>
-                            <button onclick="insertChatEmoji('💪')">💪</button><button onclick="insertChatEmoji('✨')">✨</button>
-                            <button onclick="insertChatEmoji('🚀')">🚀</button><button onclick="insertChatEmoji('💼')">💼</button>
-                            <button onclick="insertChatEmoji('📌')">📌</button><button onclick="insertChatEmoji('✅')">✅</button>
+                        <div class="emoji-tabs">
+                            <button class="emoji-tab active" onclick="showEmojiCat('smileys',this)">😊</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('gestures',this)">👋</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('hearts',this)">❤️</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('objects',this)">💼</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('symbols',this)">✅</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('animals',this)">🐱</button>
+                            <button class="emoji-tab" onclick="showEmojiCat('food',this)">🍕</button>
                         </div>
+                        <div class="chat-emoji-grid" id="emojiGrid"></div>
                     </div>
                     <div id="chatFilePreview" class="chat-file-preview" style="display:none;">
                         📎 <span id="chatFileName"></span> <button onclick="clearChatFile()" style="background:none;border:none;cursor:pointer;color:#999;">✕</button>

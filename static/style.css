@@ -989,17 +989,26 @@ button { font-family:inherit; }
 /* Chat emoji picker */
 .chat-emoji-picker {
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
-    padding:0.5rem; margin-bottom:0.25rem; flex-shrink:0;
+    padding:0.5rem; margin-bottom:0.25rem; flex-shrink:0; max-height:220px; display:flex; flex-direction:column;
 }
-.chat-emoji-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:0.1rem; }
+.emoji-tabs {
+    display:flex; gap:0.15rem; padding-bottom:0.4rem; border-bottom:1px solid var(--border); margin-bottom:0.4rem;
+}
+.emoji-tab {
+    background:none; border:none; font-size:1.1rem; padding:0.3rem 0.5rem;
+    cursor:pointer; border-radius:0.25rem; transition:background 0.15s;
+}
+.emoji-tab:hover { background:var(--bg); }
+.emoji-tab.active { background:var(--bg); box-shadow:0 1px 0 var(--accent); }
+.chat-emoji-grid {
+    display:grid; grid-template-columns:repeat(8, 1fr); gap:0.1rem;
+    overflow-y:auto; flex:1;
+}
 .chat-emoji-grid button {
     background:none; border:none; font-size:1.3rem; padding:0.3rem;
     cursor:pointer; border-radius:0.25rem; transition:background 0.15s;
 }
 .chat-emoji-grid button:hover { background:var(--bg); }
-@media (max-width: 768px) {
-    .chat-emoji-grid { grid-template-columns:repeat(8, 1fr); }
-}
 
 /* Chat file preview */
 .chat-file-preview {
