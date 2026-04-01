@@ -390,6 +390,16 @@ def create_notification(user_id, from_user_id, ntype, message, conn=None, relate
         conn.commit()
         conn.close()
 
+import re
+def process_mentions(text, sender_id, sender_name, context, conn, related_id=None):
+    """Find @username mentions in text and send notifications."""
+    mentions = re.findall(r'@(\w+)', text)
+    for uname in set(mentions):
+        user = conn.execute('SELECT id FROM users WHERE LOWER(username)=LOWER(?)', (uname,)).fetchone()
+        if user and user['id'] != sender_id:
+            create_notification(user['id'], sender_id, 'mention',
+                               f'{sender_name} mentioned you in {context}', conn, related_id=related_id)
+
 # ─── ROUTES ───
 
 @app.route('/')
@@ -872,6 +882,7 @@ def create_post():
         create_notification(f['friend_id'], session['user_id'], 'new_post',
                            f'Your friend {session["username"]} shared a new post, react to it!',
                            conn, related_id=post_id)
+    process_mentions(data['content'], session['user_id'], session['username'], 'a post', conn, related_id=post_id)
     conn.commit()
     conn.close()
     return jsonify({'message': 'Post created', 'post_id': post_id}), 201
@@ -1012,6 +1023,7 @@ def add_comment(post_id):
     if post and post['user_id'] != session['user_id']:
         create_notification(post['user_id'], session['user_id'], 'comment',
                            f'{session["username"]} commented on your post: {post["title"][:40]}', conn, related_id=post_id)
+    process_mentions(data['content'], session['user_id'], session['username'], 'a comment', conn, related_id=post_id)
     conn.commit()
     conn.close()
     return jsonify({'message': 'Comment added'}), 201
@@ -1488,6 +1500,8 @@ def send_group_message(group_id):
     conn.execute('INSERT INTO group_messages (group_id, sender_id, message, file_url, file_name, reply_to_id, scheduled_at) VALUES (?,?,?,?,?,?,?)',
                  (group_id, session['user_id'], msg, data.get('file_url'), data.get('file_name'),
                   data.get('reply_to_id'), data.get('scheduled_at')))
+    if msg:
+        process_mentions(msg, session['user_id'], session['username'], 'a group chat', conn)
     conn.commit()
     conn.close()
     return jsonify({'message': 'Sent'}), 201
@@ -1540,6 +1554,8 @@ def send_message_enhanced():
     conn.execute('INSERT INTO messages (sender_id, receiver_id, message, reply_to_id, file_url, file_name, scheduled_at) VALUES (?,?,?,?,?,?,?)',
                  (session['user_id'], data['receiver_id'], msg, data.get('reply_to_id'),
                   data.get('file_url'), data.get('file_name'), data.get('scheduled_at')))
+    if msg:
+        process_mentions(msg, session['user_id'], session['username'], 'a chat', conn)
     conn.commit()
     conn.close()
     if not data.get('scheduled_at'):

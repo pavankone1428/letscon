@@ -241,8 +241,9 @@
                         </div>
                         <button class="reply-preview-close" onclick="cancelReply()">✕</button>
                     </div>
-                    <div class="chat-input-bar">
-                        <input type="text" id="inlineChatInput" placeholder="Type a message" />
+                    <div class="chat-input-bar" style="position:relative;">
+                        <div class="mention-dropdown" id="chatMentionDropdown"></div>
+                        <input type="text" id="inlineChatInput" placeholder="Type a message" oninput="handleMentionInput(this, 'chatMentionDropdown')" />
                         <div class="chat-input-icons">
                             <button class="chat-icon-btn" onclick="toggleChatEmoji()" title="Emoji">😊</button>
                             <div class="chat-plus-wrap">
@@ -324,7 +325,10 @@
                         <label class="type-option" data-value="achievement"><input type="radio" name="postType" value="achievement" hidden>🏆 Achievement</label>
                     </div>
                     <input type="text" id="postTitle" placeholder="Title" />
-                    <textarea id="postContent" placeholder="Describe in detail..." rows="5"></textarea>
+                    <div style="position:relative;">
+                        <div class="mention-dropdown" id="postMentionDropdown"></div>
+                        <textarea id="postContent" placeholder="Describe in detail... Use @username to mention" rows="5" oninput="handleMentionInput(this, 'postMentionDropdown')"></textarea>
+                    </div>
                     <input type="text" id="postTags" placeholder="Tags (comma separated): testing, selenium, backend" />
                     <button onclick="submitPost()" class="btn-primary">Post</button>
                 </div>
@@ -400,8 +404,9 @@
                     <span id="commentReplyName" style="font-weight:700;color:#7c3aed;"></span>
                     <button onclick="cancelCommentReply()" style="float:right;background:none;border:none;cursor:pointer;color:#999;">✕</button>
                 </div>
-                <div class="bottom-sheet-input">
-                    <input type="text" id="commentInput" placeholder="Add a comment..." />
+                <div class="bottom-sheet-input" style="position:relative;">
+                    <div class="mention-dropdown" id="commentMentionDropdown"></div>
+                    <input type="text" id="commentInput" placeholder="Add a comment..." oninput="handleMentionInput(this, 'commentMentionDropdown')" />
                     <button onclick="submitComment()" class="btn-primary btn-sm">Post</button>
                 </div>
             </div>

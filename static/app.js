@@ -955,6 +955,13 @@ async function loadNotifications() {
         } else if (n.type === 'story_reaction' || n.type === 'story_reply') {
             clickAction = `onclick="navigateToChat(${n.from_user_id}, '${esc(n.username)}')"`;
             clickClass = 'clickable-notif';
+        } else if (n.type === 'mention') {
+            if (n.related_id) {
+                clickAction = `onclick="navigateToPost(${n.related_id})"`;
+            } else {
+                clickAction = `onclick="navigateToChat(${n.from_user_id}, '${esc(n.username)}')"`;
+            }
+            clickClass = 'clickable-notif';
         } else if (n.type === 'new_post' || n.type === 'comment') {
             if (n.related_id) {
                 clickAction = `onclick="navigateToPost(${n.related_id})"`;
@@ -1772,6 +1779,93 @@ function recordVideoClip() {
     closeChatPlusMenu();
     showToast('🎥 Video recording coming soon!');
 }
+
+// ─── @MENTIONS ───
+let mentionConnections = [];
+let mentionActiveDropdown = null;
+let mentionActiveInput = null;
+let mentionSelectedIndex = 0;
+
+async function loadMentionConnections() {
+    try {
+        const res = await fetch('/api/connections');
+        mentionConnections = await res.json();
+    } catch { mentionConnections = []; }
+}
+
+function handleMentionInput(input, dropdownId) {
+    const val = input.value || input.textContent || '';
+    const cursorPos = input.selectionStart || val.length;
+    const textBefore = val.substring(0, cursorPos);
+    const match = textBefore.match(/@(\w*)$/);
+    const dropdown = document.getElementById(dropdownId);
+
+    if (match) {
+        const query = match[1].toLowerCase();
+        if (mentionConnections.length === 0) loadMentionConnections();
+        const filtered = mentionConnections.filter(c =>
+            c.username.toLowerCase().includes(query)
+        ).slice(0, 8);
+
+        if (filtered.length > 0) {
+            mentionActiveDropdown = dropdown;
+            mentionActiveInput = input;
+            mentionSelectedIndex = 0;
+            dropdown.innerHTML = filtered.map((c, i) => `
+                <div class="mention-item ${i === 0 ? 'active' : ''}" onmousedown="insertMention('${esc(c.username)}', '${dropdownId}')">
+                    <div class="mention-avatar">${c.username[0].toUpperCase()}</div>
+                    <div>
+                        <div class="mention-name">${esc(c.username)}</div>
+                        <div class="mention-detail">${esc(c.company || '')} ${c.role ? '· ' + esc(c.role) : ''}</div>
+                    </div>
+                </div>
+            `).join('');
+            dropdown.classList.add('open');
+        } else {
+            dropdown.classList.remove('open');
+        }
+    } else {
+        dropdown.classList.remove('open');
+    }
+}
+
+function insertMention(username, dropdownId) {
+    const input = mentionActiveInput;
+    if (!input) return;
+    const val = input.value || '';
+    const cursorPos = input.selectionStart || val.length;
+    const textBefore = val.substring(0, cursorPos);
+    const textAfter = val.substring(cursorPos);
+    const newBefore = textBefore.replace(/@\w*$/, '@' + username + ' ');
+    input.value = newBefore + textAfter;
+    input.focus();
+    input.selectionStart = input.selectionEnd = newBefore.length;
+    document.getElementById(dropdownId).classList.remove('open');
+}
+
+// Keyboard navigation for mention dropdown
+document.addEventListener('keydown', (e) => {
+    if (!mentionActiveDropdown || !mentionActiveDropdown.classList.contains('open')) return;
+    const items = mentionActiveDropdown.querySelectorAll('.mention-item');
+    if (items.length === 0) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        mentionSelectedIndex = Math.min(mentionSelectedIndex + 1, items.length - 1);
+        items.forEach((it, i) => it.classList.toggle('active', i === mentionSelectedIndex));
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
+        items.forEach((it, i) => it.classList.toggle('active', i === mentionSelectedIndex));
+    } else if (e.key === 'Enter' && items[mentionSelectedIndex]) {
+        e.preventDefault();
+        items[mentionSelectedIndex].dispatchEvent(new Event('mousedown'));
+    } else if (e.key === 'Escape') {
+        mentionActiveDropdown.classList.remove('open');
+    }
+});
+
+// Load connections for mentions on init
+loadMentionConnections();
 
 // ─── CUSTOM CONFIRM DIALOG ───
 let confirmResolve = null;
