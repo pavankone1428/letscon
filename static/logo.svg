@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="personL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="personR" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect x="10" y="10" width="180" height="180" rx="40" fill="url(#bg)" opacity="0.12"/>
+  <!-- Top arc connecting people -->
+  <path d="M55 95 C55 45, 145 45, 145 95" stroke="url(#arc)" stroke-width="3.5" fill="none" stroke-dasharray="6 4"/>
+  <!-- Bottom arc -->
+  <path d="M55 145 C55 170, 145 170, 145 145" stroke="url(#arc)" stroke-width="3" fill="none" opacity="0.5"/>
+  <!-- Speech bubble -->
+  <ellipse cx="100" cy="68" rx="42" ry="22" fill="white" stroke="url(#arc)" stroke-width="2.5"/>
+  <polygon points="88,88 96,90 92,80" fill="white"/>
+  <polygon points="88,88 96,90 92,80" fill="none" stroke="url(#arc)" stroke-width="2" stroke-linejoin="round"/>
+  <!-- LetsCon text -->
+  <text x="100" y="74" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="20" font-weight="700" fill="url(#arc)">LetsCon</text>
+  <!-- Left person -->
+  <circle cx="55" cy="108" r="12" fill="url(#personL)"/>
+  <path d="M40 145 L45 125 L55 130 L65 125 L70 145 Z" fill="url(#personL)"/>
+  <line x1="55" y1="130" x2="55" y2="143" stroke="white" stroke-width="2"/>
+  <line x1="50" y1="133" x2="55" y2="138" stroke="white" stroke-width="1.5"/>
+  <line x1="60" y1="133" x2="55" y2="138" stroke="white" stroke-width="1.5"/>
+  <!-- Right person -->
+  <circle cx="145" cy="108" r="12" fill="url(#personR)"/>
+  <path d="M130 145 L135 125 L145 130 L155 125 L160 145 Z" fill="url(#personR)"/>
+  <line x1="145" y1="130" x2="145" y2="143" stroke="white" stroke-width="2"/>
+  <line x1="140" y1="133" x2="145" y2="138" stroke="white" stroke-width="1.5"/>
+  <line x1="150" y1="133" x2="145" y2="138" stroke="white" stroke-width="1.5"/>
+</svg>
