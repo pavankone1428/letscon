@@ -15,20 +15,88 @@ app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
+DATABASE_URL = os.environ.get('DATABASE_URL')
+USE_PG = bool(DATABASE_URL)
+
+if USE_PG:
+    import psycopg2
+    import psycopg2.extras
+
 otp_store = {}
 
+class PgConnectionWrapper:
+    """Wraps psycopg2 connection to behave like sqlite3 with Row factory."""
+    def __init__(self, conn):
+        self._conn = conn
+    def execute(self, sql, params=None):
+        sql = sql.replace('?', '%s')
+        sql = sql.replace("datetime('now', '-24 hours')", "(NOW() - INTERVAL '24 hours')")
+        sql = sql.replace("datetime('now','+24 hours')", "(NOW() + INTERVAL '24 hours')")
+        sql = sql.replace('datetime("now","+24 hours")', "(NOW() + INTERVAL '24 hours')")
+        sql = sql.replace("datetime('now')", "NOW()")
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            cur.execute(sql, params or ())
+        except Exception as e:
+            self._conn.rollback()
+            err = str(e).lower()
+            if 'duplicate' in err or 'already exists' in err or 'unique' in err:
+                return cur
+            raise
+        return cur
+    def commit(self):
+        self._conn.commit()
+    def close(self):
+        self._conn.close()
+
+def row_val(row, key_or_index):
+    """Get value from a row that might be a dict (PG) or sqlite3.Row."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(key_or_index) if isinstance(key_or_index, str) else list(row.values())[key_or_index]
+    return row[key_or_index]
+
+def get_last_id(conn, table=''):
+    """Get last inserted ID, works for both SQLite and PostgreSQL."""
+    if USE_PG:
+        r = conn.execute(f"SELECT currval(pg_get_serial_sequence('{table}', 'id'))").fetchone()
+        return row_val(r, 'currval')
+    else:
+        return conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+
 def get_db():
-    conn = sqlite3.connect('refnet.db', timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
+    if USE_PG:
+        conn = psycopg2.connect(DATABASE_URL)
+        return PgConnectionWrapper(conn)
+    else:
+        conn = sqlite3.connect('refnet.db', timeout=10)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        return conn
 
 def init_db():
     conn = get_db()
-    c = conn.cursor()
+    if USE_PG:
+        c = conn
+    else:
+        c = conn
 
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
+    def run(sql):
+        """Run DDL, converting syntax for PostgreSQL if needed."""
+        if USE_PG:
+            sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+            sql = sql.replace('BOOLEAN DEFAULT 0', 'BOOLEAN DEFAULT FALSE')
+            sql = sql.replace('BOOLEAN DEFAULT 1', 'BOOLEAN DEFAULT TRUE')
+            try:
+                conn.execute(sql)
+            except:
+                pass
+        else:
+            conn.execute(sql)
+
+    run('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         username TEXT NOT NULL,
@@ -49,7 +117,7 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS referral_requests (
+    run('''CREATE TABLE IF NOT EXISTS referral_requests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         seeker_id INTEGER NOT NULL,
         target_company TEXT NOT NULL,
@@ -64,7 +132,7 @@ def init_db():
         FOREIGN KEY (matched_referrer_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS posts (
+    run('''CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         type TEXT DEFAULT 'problem',
@@ -77,7 +145,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS comments (
+    run('''CREATE TABLE IF NOT EXISTS comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         post_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -88,7 +156,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS comment_votes (
+    run('''CREATE TABLE IF NOT EXISTS comment_votes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         comment_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -99,7 +167,7 @@ def init_db():
         UNIQUE(comment_id, user_id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS post_votes (
+    run('''CREATE TABLE IF NOT EXISTS post_votes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         post_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -110,7 +178,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS bookmarks (
+    run('''CREATE TABLE IF NOT EXISTS bookmarks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         post_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -120,7 +188,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS connections (
+    run('''CREATE TABLE IF NOT EXISTS connections (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sender_id INTEGER NOT NULL,
         receiver_id INTEGER NOT NULL,
@@ -131,7 +199,7 @@ def init_db():
         UNIQUE(sender_id, receiver_id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS messages (
+    run('''CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sender_id INTEGER NOT NULL,
         receiver_id INTEGER NOT NULL,
@@ -145,7 +213,7 @@ def init_db():
         FOREIGN KEY (reply_to_id) REFERENCES messages(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS message_reactions (
+    run('''CREATE TABLE IF NOT EXISTS message_reactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         message_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -155,7 +223,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS stories (
+    run('''CREATE TABLE IF NOT EXISTS stories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         content TEXT NOT NULL,
@@ -167,7 +235,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS story_reactions (
+    run('''CREATE TABLE IF NOT EXISTS story_reactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         story_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -177,7 +245,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS story_replies (
+    run('''CREATE TABLE IF NOT EXISTS story_replies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         story_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -187,7 +255,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS story_views (
+    run('''CREATE TABLE IF NOT EXISTS story_views (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         story_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -198,7 +266,7 @@ def init_db():
     )''')
 
     # ─── GROUP CHAT TABLES ───
-    c.execute('''CREATE TABLE IF NOT EXISTS groups (
+    run('''CREATE TABLE IF NOT EXISTS groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT,
@@ -209,7 +277,7 @@ def init_db():
         FOREIGN KEY (creator_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS group_members (
+    run('''CREATE TABLE IF NOT EXISTS group_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
@@ -220,7 +288,7 @@ def init_db():
         UNIQUE(group_id, user_id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS group_messages (
+    run('''CREATE TABLE IF NOT EXISTS group_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         group_id INTEGER NOT NULL,
         sender_id INTEGER NOT NULL,
@@ -235,7 +303,7 @@ def init_db():
         FOREIGN KEY (sender_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS reports (
+    run('''CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reporter_id INTEGER NOT NULL,
         reported_user_id INTEGER,
@@ -248,7 +316,7 @@ def init_db():
         FOREIGN KEY (reporter_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+    run('''CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         from_user_id INTEGER,
@@ -260,7 +328,7 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS company_reviews (
+    run('''CREATE TABLE IF NOT EXISTS company_reviews (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         company TEXT NOT NULL,
@@ -279,34 +347,34 @@ def init_db():
     # Migrate existing DB
     for col, ctype in [('is_private', 'BOOLEAN DEFAULT 0'), ('resume', 'TEXT'), ('profile_photo', 'TEXT'), ('bio', 'TEXT')]:
         try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype}")
-        except sqlite3.OperationalError:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype}")
+        except Exception:
             pass
     try:
-        c.execute("ALTER TABLE post_votes ADD COLUMN reaction TEXT DEFAULT 'like'")
-    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE post_votes ADD COLUMN reaction TEXT DEFAULT 'like'")
+    except Exception:
         pass
     try:
-        c.execute("ALTER TABLE notifications ADD COLUMN related_id INTEGER")
-    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE notifications ADD COLUMN related_id INTEGER")
+    except Exception:
         pass
     for col, ctype in [('reply_to_id', 'INTEGER'), ('starred', 'BOOLEAN DEFAULT 0')]:
         try:
-            c.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
-        except sqlite3.OperationalError:
+            conn.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
+        except Exception:
             pass
     try:
-        c.execute("ALTER TABLE stories ADD COLUMN media_url TEXT")
-    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE stories ADD COLUMN media_url TEXT")
+    except Exception:
         pass
     try:
-        c.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER")
-    except sqlite3.OperationalError:
+        conn.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER")
+    except Exception:
         pass
     for col, ctype in [('file_url', 'TEXT'), ('file_name', 'TEXT'), ('scheduled_at', 'TIMESTAMP'), ('delivered', 'BOOLEAN DEFAULT 1')]:
         try:
-            c.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
-        except sqlite3.OperationalError:
+            conn.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
+        except Exception:
             pass
 
     # Seed test users if they don't exist
@@ -315,23 +383,23 @@ def init_db():
         ('sasuke@leafvillage.com', 'SASUKE', 'Sakura', 'Leaf Village', 'ANBU Captain', 'Python, Security, Strategy'),
     ]
     for email, username, pw, company, role, skills in test_users:
-        existing = c.execute('SELECT id FROM users WHERE email=?', (email,)).fetchone()
+        existing = conn.execute('SELECT id FROM users WHERE email=?', (email,)).fetchone()
         if not existing:
-            c.execute('INSERT INTO users (email, username, password, company, role, skills) VALUES (?,?,?,?,?,?)',
+            conn.execute('INSERT INTO users (email, username, password, company, role, skills) VALUES (?,?,?,?,?,?)',
                       (email, username, generate_password_hash(pw), company, role, skills))
 
     conn.commit()
 
     # Seed static data if DB is fresh (no posts exist)
-    has_posts = c.execute('SELECT COUNT(*) FROM posts').fetchone()[0]
+    has_posts = row_val(conn.execute('SELECT COUNT(*) as cnt FROM posts').fetchone(), 'cnt')
     if has_posts == 0:
-        naruto = c.execute('SELECT id FROM users WHERE email=?', ('naruto@leafvillage.com',)).fetchone()
-        sasuke = c.execute('SELECT id FROM users WHERE email=?', ('sasuke@leafvillage.com',)).fetchone()
+        naruto = conn.execute('SELECT id FROM users WHERE email=?', ('naruto@leafvillage.com',)).fetchone()
+        sasuke = conn.execute('SELECT id FROM users WHERE email=?', ('sasuke@leafvillage.com',)).fetchone()
         if naruto and sasuke:
-            nid, sid = naruto[0], sasuke[0]
+            nid, sid = row_val(naruto, 'id'), row_val(sasuke, 'id')
 
             # Make them connected
-            c.execute('INSERT INTO connections (sender_id, receiver_id, status) VALUES (?,?,?)', (nid, sid, 'accepted'))
+            conn.execute('INSERT INTO connections (sender_id, receiver_id, status) VALUES (?,?,?)', (nid, sid, 'accepted'))
 
             # Seed posts
             seed_posts = [
@@ -343,7 +411,7 @@ def init_db():
                 (sid, 'achievement', 'Completed S-rank security audit', 'Successfully completed a full security audit of the village network. Zero critical vulnerabilities found after our patches.', 'security,audit,milestone'),
             ]
             for uid, ptype, title, content, tags in seed_posts:
-                c.execute('INSERT INTO posts (user_id, type, title, content, tags) VALUES (?,?,?,?,?)',
+                conn.execute('INSERT INTO posts (user_id, type, title, content, tags) VALUES (?,?,?,?,?)',
                           (uid, ptype, title, content, tags))
 
             # Seed stories
@@ -354,24 +422,24 @@ def init_db():
                 (sid, 'Training session at 6 AM tomorrow. Who is in?', '#dc2626'),
             ]
             for uid, content, color in seed_stories:
-                c.execute('INSERT INTO stories (user_id, content, type, bg_color, expires_at) VALUES (?,?,?,?,datetime("now","+24 hours"))',
-                          (uid, content, 'text', color))
+                conn.execute('INSERT INTO stories (user_id, content, type, bg_color, expires_at) VALUES (?,?,?,?,datetime("now","+24 hours"))',
+                             (uid, content, 'text', color))
 
             # Seed some comments
-            posts = c.execute('SELECT id, user_id FROM posts').fetchall()
+            posts = conn.execute('SELECT id, user_id FROM posts').fetchall()
             seed_comments = [
-                (posts[0][0], sid, 'Congratulations Naruto! Well deserved!'),
-                (posts[1][0], nid, 'I recommend using encrypted scroll protocols. Works great for our team.'),
-                (posts[2][0], sid, 'Try limiting clone count to 1000. Use a queue system for the rest.'),
-                (posts[3][0], nid, 'This is amazing! Will try this in our next sprint review.'),
+                (row_val(posts[0], 'id'), sid, 'Congratulations Naruto! Well deserved!'),
+                (row_val(posts[1], 'id'), nid, 'I recommend using encrypted scroll protocols. Works great for our team.'),
+                (row_val(posts[2], 'id'), sid, 'Try limiting clone count to 1000. Use a queue system for the rest.'),
+                (row_val(posts[3], 'id'), nid, 'This is amazing! Will try this in our next sprint review.'),
             ]
             for post_id, uid, content in seed_comments:
-                c.execute('INSERT INTO comments (post_id, user_id, content) VALUES (?,?,?)', (post_id, uid, content))
+                conn.execute('INSERT INTO comments (post_id, user_id, content) VALUES (?,?,?)', (post_id, uid, content))
 
             # Seed a company review
-            c.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
+            conn.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
                       (nid, 'Leaf Village', '80-120K', 4, 5, 'medium', 'Great place to work. The Hokage really cares about work-life balance. Free ramen on Fridays!', 1))
-            c.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
+            conn.execute('INSERT INTO company_reviews (user_id, company, salary_range, work_life_rating, manager_rating, work_pressure, review, anonymous) VALUES (?,?,?,?,?,?,?,?)',
                       (sid, 'Leaf Village', '90-130K', 3, 4, 'high', 'Challenging missions but great learning opportunities. ANBU division has intense work pressure though.', 1))
 
             conn.commit()
@@ -430,7 +498,7 @@ def register():
         conn.execute('''INSERT INTO users (email, username, password, company, role)
                         VALUES (?,?,?,?,?)''', (email, username, hashed, company, role))
         conn.commit()
-        user_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+        user_id = get_last_id(conn, 'users')
         session['user_id'] = user_id
         session['username'] = username
         return jsonify({'message': 'Registration successful'})
@@ -872,7 +940,7 @@ def create_post():
     conn.execute('INSERT INTO posts (user_id, type, title, content, tags) VALUES (?,?,?,?,?)',
                  (session['user_id'], data.get('type', 'problem'), data['title'],
                   data['content'], data.get('tags', '')))
-    post_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    post_id = get_last_id(conn, 'posts')
     # Notify all connections about the new post
     friends = conn.execute(
         '''SELECT CASE WHEN sender_id=? THEN receiver_id ELSE sender_id END as friend_id
@@ -1278,8 +1346,12 @@ def view_story(story_id):
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
     try:
-        conn.execute('INSERT OR IGNORE INTO story_views (story_id, user_id) VALUES (?,?)',
-                     (story_id, session['user_id']))
+        if USE_PG:
+            conn.execute('INSERT INTO story_views (story_id, user_id) VALUES (?,?) ON CONFLICT DO NOTHING',
+                         (story_id, session['user_id']))
+        else:
+            conn.execute('INSERT OR IGNORE INTO story_views (story_id, user_id) VALUES (?,?)',
+                         (story_id, session['user_id']))
         conn.commit()
     except:
         pass
@@ -1447,7 +1519,7 @@ def create_group():
     conn = get_db()
     conn.execute('INSERT INTO groups (name, description, creator_id, avatar_color) VALUES (?,?,?,?)',
                  (data['name'], data.get('description', ''), session['user_id'], data.get('avatar_color', '#7c3aed')))
-    gid = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    gid = get_last_id(conn, 'groups')
     conn.execute('INSERT INTO group_members (group_id, user_id, role) VALUES (?,?,?)', (gid, session['user_id'], 'admin'))
     # Add initial members
     for uid in data.get('member_ids', []):
