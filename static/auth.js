@@ -6,6 +6,33 @@ function showMsg(msg, type) {
     el.className = 'auth-message ' + type;
 }
 
+function showWelcome() {
+    const w = document.getElementById('welcomeScreen');
+    const f = document.getElementById('authForms');
+    if (w) w.style.display = 'block';
+    if (f) f.style.display = 'none';
+}
+
+function showLoginForm() {
+    const w = document.getElementById('welcomeScreen');
+    const f = document.getElementById('authForms');
+    if (w) w.style.display = 'none';
+    if (f) f.style.display = 'block';
+    document.getElementById('loginFormSection').style.display = 'flex';
+    document.getElementById('registerFormSection').style.display = 'none';
+    document.getElementById('authMessage').className = 'auth-message';
+}
+
+function showRegisterForm() {
+    const w = document.getElementById('welcomeScreen');
+    const f = document.getElementById('authForms');
+    if (w) w.style.display = 'none';
+    if (f) f.style.display = 'block';
+    document.getElementById('loginFormSection').style.display = 'none';
+    document.getElementById('registerFormSection').style.display = 'flex';
+    document.getElementById('authMessage').className = 'auth-message';
+}
+
 function togglePw(id) {
     const inp = document.getElementById(id);
     const btn = inp.parentElement.querySelector('.toggle-pw');
