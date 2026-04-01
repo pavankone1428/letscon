@@ -88,6 +88,13 @@ function initApp() {
         if (!e.target.closest('.post-more-wrap')) {
             document.querySelectorAll('.post-menu').forEach(m => m.classList.remove('open'));
         }
+        if (!e.target.closest('.chat-plus-wrap')) {
+            closeChatPlusMenu();
+        }
+        if (!e.target.closest('.chat-emoji-picker') && !e.target.closest('.chat-icon-btn')) {
+            const ep = document.getElementById('chatEmojiPicker');
+            if (ep) ep.style.display = 'none';
+        }
     });
 
     loadFeed();
@@ -1650,6 +1657,53 @@ function clearChatFile() {
     chatFileName = null;
     document.getElementById('chatFilePreview').style.display = 'none';
     document.getElementById('chatFileInput').value = '';
+}
+
+function toggleChatEmoji() {
+    const picker = document.getElementById('chatEmojiPicker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    closeChatPlusMenu();
+}
+
+function insertChatEmoji(emoji) {
+    const input = document.getElementById('inlineChatInput');
+    input.value += emoji;
+    input.focus();
+}
+
+function toggleChatPlusMenu() {
+    const menu = document.getElementById('chatPlusMenu');
+    menu.classList.toggle('open');
+    document.getElementById('chatEmojiPicker').style.display = 'none';
+}
+
+function closeChatPlusMenu() {
+    const menu = document.getElementById('chatPlusMenu');
+    if (menu) menu.classList.remove('open');
+}
+
+function openDeliveryOptions() {
+    closeChatPlusMenu();
+    const time = prompt('Schedule message (YYYY-MM-DD HH:MM):');
+    if (time) {
+        const input = document.getElementById('inlineChatInput');
+        const msg = input.value.trim();
+        if (!msg) { showToast('Type a message first'); return; }
+        const body = { message: msg, scheduled_at: time };
+        if (currentGroupId) {
+            fetch(`/api/groups/${currentGroupId}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        } else if (currentChatUserId) {
+            body.receiver_id = currentChatUserId;
+            fetch('/api/messages/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        }
+        input.value = '';
+        showToast('Message scheduled!');
+    }
+}
+
+function recordVideoClip() {
+    closeChatPlusMenu();
+    showToast('Video recording coming soon!');
 }
 
 // ─── CUSTOM CONFIRM DIALOG ───
