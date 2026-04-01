@@ -92,6 +92,7 @@ function initApp() {
 
     loadFeed();
     loadStories();
+    loadPublicFeed();
     checkNotifications();
     setInterval(checkNotifications, 30000);
 }
@@ -718,6 +719,7 @@ function openChat(userId, username) {
 function backToConversations() {
     showConvoView();
     currentChatUserId = null;
+    currentGroupId = null;
     currentReplyToId = null;
     loadConversations();
 }
@@ -840,12 +842,28 @@ function msgTouchEnd(e, msgId) {
 async function sendChatMessage() {
     const input = document.getElementById('inlineChatInput');
     const msg = input.value.trim();
-    if (!msg || !currentChatUserId) return;
+    if (!msg && !chatFileBase64) return;
+
+    // Group message
+    if (currentGroupId) {
+        const body = { message: msg };
+        if (chatFileBase64) { body.file_url = chatFileBase64; body.file_name = chatFileName; }
+        await fetch(`/api/groups/${currentGroupId}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        input.value = '';
+        clearChatFile();
+        loadGroupMessages();
+        return;
+    }
+
+    // DM
+    if (!currentChatUserId) return;
     const body = { receiver_id: currentChatUserId, message: msg };
     if (currentReplyToId) body.reply_to_id = currentReplyToId;
-    await fetch('/api/messages', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    if (chatFileBase64) { body.file_url = chatFileBase64; body.file_name = chatFileName; }
+    await fetch('/api/messages/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     input.value = '';
     cancelReply();
+    clearChatFile();
     loadChatMessages();
 }
 
@@ -1484,6 +1502,154 @@ async function quickSwitch(userId) {
         if (res.ok) { location.reload(); }
         else { const d = await res.json(); alert(d.error || 'Switch failed'); }
     } catch (e) { alert('Switch failed: ' + e.message); }
+}
+
+// ─── PUBLIC FEED ───
+async function loadPublicFeed() {
+    const list = document.getElementById('publicFeedList');
+    if (!list) return;
+    try {
+        const res = await fetch('/api/posts/public');
+        const posts = await res.json();
+        if (posts.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:2rem;">No posts yet</p>'; return; }
+        list.innerHTML = posts.map(p => {
+            const avatarLetter = (p.username || 'U')[0].toUpperCase();
+            return `
+            <div class="post-card">
+                <div class="post-header">
+                    <div class="post-avatar">${avatarLetter}</div>
+                    <div class="post-author-info">
+                        <span class="post-author-name">${esc(p.username)}</span>
+                        <span class="post-author-detail">${esc(p.company || '')} ${p.role ? '· ' + esc(p.role) : ''} · ${timeAgo(p.created_at)}</span>
+                    </div>
+                    <span class="post-type ${p.type}">${p.type === 'problem' ? '🔴 Problem' : p.type === 'solution' ? '🟢 Solution' : p.type === 'achievement' ? '🏆 Achievement' : '🔵 Discussion'}</span>
+                </div>
+                <h3>${esc(p.title)}</h3>
+                <div class="post-body">${esc(p.content).substring(0, 200)}${p.content.length > 200 ? '...' : ''}</div>
+                ${p.tags ? `<div class="post-tags">${p.tags.split(',').map(t => `<span class="tag">#${t.trim()}</span>`).join('')}</div>` : ''}
+                <div style="text-align:center;padding-top:0.5rem;"><span style="color:var(--accent);font-size:0.85rem;cursor:pointer;" onclick="showLoginForm();document.getElementById('loginOverlay').style.display='flex'">Login to interact →</span></div>
+            </div>`;
+        }).join('');
+    } catch {}
+}
+
+// ─── MESSAGE TAB SWITCHING ───
+function showMsgTab(tab, btn) {
+    document.querySelectorAll('#messagesConvoView .net-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('msgDmsSection').style.display = tab === 'dms' ? 'block' : 'none';
+    document.getElementById('msgGroupsSection').style.display = tab === 'groups' ? 'block' : 'none';
+    if (tab === 'groups') loadGroups();
+}
+
+// ─── GROUPS ───
+let currentGroupId = null;
+
+async function loadGroups() {
+    const list = document.getElementById('groupList');
+    if (!list) return;
+    try {
+        const res = await fetch('/api/groups');
+        const groups = await res.json();
+        if (groups.length === 0) { list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem;">No groups yet. Create one!</p>'; return; }
+        list.innerHTML = groups.map(g => `
+            <div class="convo-card" onclick="openGroupChat(${g.id}, '${esc(g.name)}')">
+                <div class="convo-avatar" style="background:${g.avatar_color || '#7c3aed'};">${g.name[0].toUpperCase()}</div>
+                <div class="convo-info">
+                    <div class="convo-name">${esc(g.name)}</div>
+                    <div class="convo-preview">${g.member_count} members</div>
+                </div>
+            </div>
+        `).join('');
+    } catch {}
+}
+
+async function openCreateGroup() {
+    document.getElementById('groupModal').classList.add('open');
+    const res = await fetch('/api/connections');
+    const conns = await res.json();
+    const picker = document.getElementById('groupMemberPicker');
+    picker.innerHTML = conns.map(c => `
+        <label style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;cursor:pointer;">
+            <input type="checkbox" class="group-member-cb" value="${c.id}" />
+            <span style="font-weight:600;font-size:0.9rem;">${esc(c.username)}</span>
+            <span style="color:#999;font-size:0.8rem;">${esc(c.company || '')}</span>
+        </label>
+    `).join('') || '<p style="color:#999;font-size:0.85rem;">Connect with people first to add them</p>';
+}
+
+async function submitCreateGroup() {
+    const name = document.getElementById('groupName').value.trim();
+    if (!name) { alert('Group name required'); return; }
+    const desc = document.getElementById('groupDesc').value.trim();
+    const memberIds = [...document.querySelectorAll('.group-member-cb:checked')].map(cb => parseInt(cb.value));
+    await fetch('/api/groups', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, description:desc, member_ids:memberIds}) });
+    closeModal('groupModal');
+    document.getElementById('groupName').value = '';
+    document.getElementById('groupDesc').value = '';
+    loadGroups();
+}
+
+async function openGroupChat(groupId, name) {
+    currentGroupId = groupId;
+    currentChatUserId = null;
+    switchTabByName('messages');
+    document.getElementById('messagesConvoView').style.display = 'none';
+    const chatView = document.getElementById('messagesChatView');
+    chatView.style.display = 'flex';
+    document.getElementById('chatUserAvatar').textContent = name[0].toUpperCase();
+    document.getElementById('inlineChatTitle').innerHTML = `<span>${esc(name)}</span> <span style="font-size:0.75rem;color:#999;font-weight:400;">group</span>`;
+    document.getElementById('replyPreview').style.display = 'none';
+    loadGroupMessages();
+}
+
+async function loadGroupMessages() {
+    if (!currentGroupId) return;
+    const res = await fetch(`/api/groups/${currentGroupId}/messages`);
+    const msgs = await res.json();
+    const container = document.getElementById('inlineChatMessages');
+    if (msgs.length === 0) { container.innerHTML = '<p style="text-align:center;color:#999;padding:2rem;">Start the conversation</p>'; return; }
+    container.innerHTML = msgs.map(m => {
+        const avatarLetter = (m.username || 'U')[0].toUpperCase();
+        return `
+        <div class="msg-row received" id="msg-${m.id}">
+            <div class="msg-avatar">${avatarLetter}</div>
+            <div class="msg-bubble-wrap">
+                <div style="font-size:0.7rem;font-weight:700;color:#7c3aed;margin-bottom:0.1rem;">${esc(m.username)}</div>
+                <div class="msg-bubble received">
+                    ${m.file_url ? `<div style="margin-bottom:0.25rem;">📎 <a href="${m.file_url}" target="_blank" style="color:inherit;">${esc(m.file_name || 'File')}</a></div>` : ''}
+                    ${esc(m.message)}
+                    <span class="time">${new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    container.scrollTop = container.scrollHeight;
+}
+
+// ─── CHAT FILE ATTACH ───
+let chatFileBase64 = null;
+let chatFileName = null;
+
+function attachChatFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Max 5MB'); input.value = ''; return; }
+    chatFileName = file.name;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        chatFileBase64 = e.target.result;
+        document.getElementById('chatFileName').textContent = file.name;
+        document.getElementById('chatFilePreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearChatFile() {
+    chatFileBase64 = null;
+    chatFileName = null;
+    document.getElementById('chatFilePreview').style.display = 'none';
+    document.getElementById('chatFileInput').value = '';
 }
 
 // ─── CUSTOM CONFIRM DIALOG ───

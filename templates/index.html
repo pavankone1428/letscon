@@ -31,30 +31,15 @@
         });
     </script>
     {% if not logged_in %}
-    <!-- Login Overlay -->
-    <div id="loginOverlay" class="login-overlay">
+    <!-- Login/Register Modal (hidden, shown on button click) -->
+    <div id="loginOverlay" class="login-overlay" style="display:none;">
         <div class="login-modal">
-            <!-- Welcome Screen -->
-            <div id="welcomeScreen">
-                <div class="welcome-hero">
-                    <img src="{{ url_for('static', filename='logo.svg') }}" alt="LetsCon" width="100" height="100" />
-                    <h1 style="color:white;font-size:1.8rem;font-weight:800;margin-top:0.75rem;">LetsCon</h1>
-                    <p style="color:rgba(255,255,255,0.75);font-size:0.9rem;margin-top:0.25rem;">Connect · Refer · Grow</p>
-                </div>
-                <div class="welcome-body">
-                    <p style="text-align:center;color:#666;font-size:0.9rem;margin-bottom:1.5rem;">Your career networking & referral platform</p>
-                    <button class="btn-primary" onclick="showLoginForm()" style="margin-bottom:0.75rem;">Log In</button>
-                    <button class="btn-outline" onclick="showRegisterForm()" style="width:100%;">Sign Up</button>
-                </div>
-            </div>
-            <!-- Login/Register Forms (hidden initially) -->
-            <div id="authForms" style="display:none;">
+            <div id="authForms">
                 <div class="login-header">
                     <h2>LetsCon</h2>
                     <p class="login-subtitle">Career Networking & Referrals</p>
                 </div>
                 <div class="login-body">
-                    <!-- Login Form -->
                     <div id="loginFormSection" class="auth-section">
                         <div class="form-group">
                             <label>Email or Username</label>
@@ -71,7 +56,6 @@
                         <div class="divider"><span>or</span></div>
                         <p class="switch-text">New here? <a href="#" id="showRegister">Create account</a></p>
                     </div>
-                    <!-- Register Form -->
                     <div id="registerFormSection" class="auth-section" style="display:none;">
                     <div class="form-group">
                         <label>Full Name</label>
@@ -100,7 +84,7 @@
                     <p class="switch-text">Already have an account? <a href="#" id="showLogin">Login</a></p>
                 </div>
                 <div id="authMessage" class="auth-message"></div>
-                <p class="switch-text" style="margin-top:0.75rem;"><a href="#" onclick="showWelcome()">← Back</a></p>
+                <p class="switch-text" style="margin-top:0.75rem;"><a href="#" onclick="document.getElementById('loginOverlay').style.display='none'">← Back</a></p>
             </div>
             </div>
         </div>
@@ -131,7 +115,8 @@
                     <span class="avatar-letter">{{ username[0]|upper }}</span>
                 </button>
                 {% else %}
-                <button id="openLogin" class="btn-primary btn-sm">Login</button>
+                <button class="btn-primary btn-sm" onclick="showLoginForm(); document.getElementById('loginOverlay').style.display='flex'">Login</button>
+                <button class="btn-outline btn-sm" style="color:white;border-color:rgba(255,255,255,0.5);" onclick="showRegisterForm(); document.getElementById('loginOverlay').style.display='flex'">Sign Up</button>
                 {% endif %}
             </div>
         </header>
@@ -149,6 +134,22 @@
 
         <!-- Main Content -->
         <main class="content-area">
+            {% if not logged_in %}
+            <!-- Public Feed -->
+            <div id="publicFeedSection">
+                <div style="text-align:center;padding:1.5rem 0 1rem;">
+                    <img src="{{ url_for('static', filename='logo.svg') }}" alt="LetsCon" width="60" height="60" />
+                    <h2 style="margin-top:0.5rem;">Welcome to LetsCon</h2>
+                    <p style="color:var(--text-secondary);font-size:0.9rem;">See what professionals are discussing</p>
+                </div>
+                <div id="publicFeedList" class="feed-list"></div>
+                <div style="text-align:center;padding:1.5rem;">
+                    <p style="color:var(--text-secondary);margin-bottom:1rem;">Join the conversation</p>
+                    <button class="btn-primary" onclick="showLoginForm(); document.getElementById('loginOverlay').style.display='flex'" style="width:auto;padding:0.75rem 2rem;">Sign Up Free</button>
+                </div>
+            </div>
+            {% endif %}
+
             {% if logged_in %}
 
             <!-- Feed Tab -->
@@ -211,8 +212,17 @@
             <!-- Messages Tab -->
             <div id="messagesTab" class="tab-content">
                 <div id="messagesConvoView">
-                    <h2>Messages</h2>
-                    <div id="conversationList"></div>
+                    <div class="network-tabs" style="margin-bottom:0.75rem;">
+                        <button class="net-tab active" onclick="showMsgTab('dms', this)">💬 Chats</button>
+                        <button class="net-tab" onclick="showMsgTab('groups', this)">👥 Groups</button>
+                    </div>
+                    <div id="msgDmsSection">
+                        <div id="conversationList"></div>
+                    </div>
+                    <div id="msgGroupsSection" style="display:none;">
+                        <button onclick="openCreateGroup()" class="btn-primary btn-sm" style="width:100%;margin-bottom:0.75rem;">+ New Group</button>
+                        <div id="groupList"></div>
+                    </div>
                 </div>
                 <div id="messagesChatView" style="display:none;">
                     <div class="inline-chat-header">
@@ -232,8 +242,15 @@
                         <button class="reply-preview-close" onclick="cancelReply()">✕</button>
                     </div>
                     <div class="chat-input-bar">
+                        <label class="chat-attach-btn" title="Attach file">
+                            <span>+</span>
+                            <input type="file" id="chatFileInput" onchange="attachChatFile(this)" style="display:none;" />
+                        </label>
                         <input type="text" id="inlineChatInput" placeholder="Type a message..." />
                         <button onclick="sendChatMessage()" class="btn-primary btn-sm">Send</button>
+                    </div>
+                    <div id="chatFilePreview" style="display:none;padding:0.25rem 0.5rem;font-size:0.8rem;color:var(--accent);display:none;">
+                        📎 <span id="chatFileName"></span> <button onclick="clearChatFile()" style="background:none;border:none;cursor:pointer;color:#999;">✕</button>
                     </div>
                 </div>
             </div>
@@ -356,6 +373,25 @@
                 <div class="bottom-sheet-input">
                     <input type="text" id="commentInput" placeholder="Add a comment..." />
                     <button onclick="submitComment()" class="btn-primary btn-sm">Post</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Group Modal -->
+        <div id="groupModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>New Group</h3>
+                    <button class="close-btn" onclick="closeModal('groupModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="groupName" placeholder="Group name" />
+                    <textarea id="groupDesc" placeholder="Description (optional)" rows="2"></textarea>
+                    <div class="form-group">
+                        <label>Add Members (from connections)</label>
+                        <div id="groupMemberPicker" style="max-height:200px;overflow-y:auto;"></div>
+                    </div>
+                    <button onclick="submitCreateGroup()" class="btn-primary">Create Group</button>
                 </div>
             </div>
         </div>

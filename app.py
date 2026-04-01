@@ -197,6 +197,44 @@ def init_db():
         UNIQUE(story_id, user_id)
     )''')
 
+    # ─── GROUP CHAT TABLES ───
+    c.execute('''CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        creator_id INTEGER NOT NULL,
+        avatar_color TEXT DEFAULT '#7c3aed',
+        max_members INTEGER DEFAULT 150,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (creator_id) REFERENCES users(id)
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS group_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        role TEXT DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES groups(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(group_id, user_id)
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS group_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_id INTEGER NOT NULL,
+        sender_id INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        file_url TEXT,
+        file_name TEXT,
+        reply_to_id INTEGER,
+        scheduled_at TIMESTAMP,
+        delivered BOOLEAN DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (group_id) REFERENCES groups(id),
+        FOREIGN KEY (sender_id) REFERENCES users(id)
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reporter_id INTEGER NOT NULL,
@@ -265,6 +303,11 @@ def init_db():
         c.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER")
     except sqlite3.OperationalError:
         pass
+    for col, ctype in [('file_url', 'TEXT'), ('file_name', 'TEXT'), ('scheduled_at', 'TIMESTAMP'), ('delivered', 'BOOLEAN DEFAULT 1')]:
+        try:
+            c.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
+        except sqlite3.OperationalError:
+            pass
 
     # Seed test users if they don't exist
     test_users = [
@@ -753,6 +796,21 @@ def get_matches(req_id):
     return jsonify(matches[:20])
 
 # ─── POSTS (PROBLEM-SOLUTION FEED) ───
+
+@app.route('/api/posts/public', methods=['GET'])
+def get_public_posts():
+    conn = get_db()
+    posts = conn.execute('''SELECT p.*, u.username, u.company, u.role,
+               (SELECT COUNT(*) FROM comments WHERE post_id=p.id) as comment_count
+               FROM posts p JOIN users u ON p.user_id=u.id
+               ORDER BY p.created_at DESC LIMIT 10''').fetchall()
+    result = []
+    for p in posts:
+        pd = dict(p)
+        pd['reactions'] = {}
+        result.append(pd)
+    conn.close()
+    return jsonify(result)
 
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
@@ -1352,6 +1410,142 @@ def add_review():
     conn.commit()
     conn.close()
     return jsonify({'message': 'Review submitted'}), 201
+
+# ─── GROUP CHAT ───
+
+@app.route('/api/groups', methods=['GET'])
+def get_groups():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    groups = conn.execute('''SELECT g.*, gm.role,
+               (SELECT COUNT(*) FROM group_members WHERE group_id=g.id) as member_count
+               FROM groups g JOIN group_members gm ON g.id=gm.group_id
+               WHERE gm.user_id=? ORDER BY g.created_at DESC''', (session['user_id'],)).fetchall()
+    conn.close()
+    return jsonify([dict(g) for g in groups])
+
+@app.route('/api/groups', methods=['POST'])
+def create_group():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    if not data.get('name'):
+        return jsonify({'error': 'Group name required'}), 400
+    conn = get_db()
+    conn.execute('INSERT INTO groups (name, description, creator_id, avatar_color) VALUES (?,?,?,?)',
+                 (data['name'], data.get('description', ''), session['user_id'], data.get('avatar_color', '#7c3aed')))
+    gid = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    conn.execute('INSERT INTO group_members (group_id, user_id, role) VALUES (?,?,?)', (gid, session['user_id'], 'admin'))
+    # Add initial members
+    for uid in data.get('member_ids', []):
+        try:
+            conn.execute('INSERT INTO group_members (group_id, user_id) VALUES (?,?)', (gid, uid))
+        except:
+            pass
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Group created', 'group_id': gid}), 201
+
+@app.route('/api/groups/<int:group_id>', methods=['GET'])
+def get_group_detail(group_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    group = conn.execute('SELECT * FROM groups WHERE id=?', (group_id,)).fetchone()
+    if not group:
+        conn.close()
+        return jsonify({'error': 'Group not found'}), 404
+    members = conn.execute('''SELECT gm.*, u.username, u.company, u.role as user_role
+                              FROM group_members gm JOIN users u ON gm.user_id=u.id
+                              WHERE gm.group_id=?''', (group_id,)).fetchall()
+    conn.close()
+    gd = dict(group)
+    gd['members'] = [dict(m) for m in members]
+    return jsonify(gd)
+
+@app.route('/api/groups/<int:group_id>/messages', methods=['GET'])
+def get_group_messages(group_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    msgs = conn.execute('''SELECT gm.*, u.username
+                           FROM group_messages gm JOIN users u ON gm.sender_id=u.id
+                           WHERE gm.group_id=? AND (gm.scheduled_at IS NULL OR gm.scheduled_at <= datetime('now'))
+                           ORDER BY gm.created_at ASC''', (group_id,)).fetchall()
+    conn.close()
+    return jsonify([dict(m) for m in msgs])
+
+@app.route('/api/groups/<int:group_id>/messages', methods=['POST'])
+def send_group_message(group_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    msg = data.get('message', '').strip()
+    if not msg and not data.get('file_url'):
+        return jsonify({'error': 'Message required'}), 400
+    conn = get_db()
+    conn.execute('INSERT INTO group_messages (group_id, sender_id, message, file_url, file_name, reply_to_id, scheduled_at) VALUES (?,?,?,?,?,?,?)',
+                 (group_id, session['user_id'], msg, data.get('file_url'), data.get('file_name'),
+                  data.get('reply_to_id'), data.get('scheduled_at')))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Sent'}), 201
+
+@app.route('/api/groups/<int:group_id>/members', methods=['POST'])
+def add_group_member(group_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    conn = get_db()
+    # Check if admin
+    role = conn.execute('SELECT role FROM group_members WHERE group_id=? AND user_id=?', (group_id, session['user_id'])).fetchone()
+    if not role or role['role'] != 'admin':
+        conn.close()
+        return jsonify({'error': 'Only admins can add members'}), 403
+    count = conn.execute('SELECT COUNT(*) as cnt FROM group_members WHERE group_id=?', (group_id,)).fetchone()['cnt']
+    if count >= 150:
+        conn.close()
+        return jsonify({'error': 'Group is full (max 150)'}), 400
+    try:
+        conn.execute('INSERT INTO group_members (group_id, user_id) VALUES (?,?)', (group_id, data['user_id']))
+        conn.commit()
+    except:
+        conn.close()
+        return jsonify({'error': 'Already a member'}), 400
+    conn.close()
+    return jsonify({'message': 'Member added'})
+
+@app.route('/api/groups/<int:group_id>/leave', methods=['POST'])
+def leave_group(group_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    conn.execute('DELETE FROM group_members WHERE group_id=? AND user_id=?', (group_id, session['user_id']))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Left group'})
+
+# ─── CHAT FILE UPLOAD & SCHEDULED MESSAGES ───
+
+@app.route('/api/messages/send', methods=['POST'])
+def send_message_enhanced():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    msg = data.get('message', '').strip()
+    if not msg and not data.get('file_url'):
+        return jsonify({'error': 'Message or file required'}), 400
+    conn = get_db()
+    conn.execute('INSERT INTO messages (sender_id, receiver_id, message, reply_to_id, file_url, file_name, scheduled_at) VALUES (?,?,?,?,?,?,?)',
+                 (session['user_id'], data['receiver_id'], msg, data.get('reply_to_id'),
+                  data.get('file_url'), data.get('file_name'), data.get('scheduled_at')))
+    conn.commit()
+    conn.close()
+    if not data.get('scheduled_at'):
+        create_notification(data['receiver_id'], session['user_id'], 'message',
+                           f'New message from {session["username"]}')
+    return jsonify({'message': 'Sent'}), 201
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
