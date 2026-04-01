@@ -464,19 +464,26 @@ async function loadPeople() {
                 </div>
                 <div class="person-action" style="display:flex;gap:0.5rem;">
                     <button class="btn-outline btn-sm" onclick="viewUserProfile(${u.id})">View</button>
-                    ${u.connection_status === null ? `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id})">Connect</button>` :
-                      u.connection_status === 'pending' && u.is_sender ? `<button class="btn-outline btn-sm" disabled>Pending</button>` :
+                    ${u.connection_status === null ? `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id}, this)">Connect</button>` :
+                      u.connection_status === 'pending' && u.is_sender ? `<button class="btn-outline btn-sm" disabled>⏳ Pending</button>` :
                       u.connection_status === 'pending' && !u.is_sender ? `<button class="btn-primary btn-sm btn-accent" onclick="acceptFromNotif(${u.id})">Accept</button>` :
                       u.connection_status === 'accepted' ? `<button class="btn-primary btn-sm" onclick="openChat(${u.id}, '${esc(u.username)}')">Message</button>` :
-                      `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id})">Connect</button>`}
+                      `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id}, this)">Connect</button>`}
                 </div>
             </div>
         `).join('');
     } catch { list.innerHTML = '<p style="color:#dc3545;text-align:center;">Failed to load</p>'; }
 }
 
-async function sendRequest(userId) {
-    await fetch('/api/connections/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({receiver_id:userId}) });
+async function sendRequest(userId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> Sending...'; }
+    try {
+        await fetch('/api/connections/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({receiver_id:userId}) });
+        if (btn) { btn.innerHTML = '✓ Request Sent'; btn.classList.remove('btn-primary'); btn.classList.add('btn-outline'); }
+        else loadPeople();
+    } catch {
+        if (btn) { btn.innerHTML = 'Connect'; btn.disabled = false; }
+    }
     loadPeople();
 }
 
@@ -567,7 +574,10 @@ async function viewUserProfile(userId) {
 
                 <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
                     ${u.is_connected ? `<button class="btn-primary btn-sm" onclick="openChat(${u.id}, '${esc(u.username)}')">💬 Message</button>` : ''}
-                    ${u.is_connected ? '' : `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id})">+ Connect</button>`}
+                    ${u.connection_status === 'accepted' ? '' :
+                      u.connection_status === 'pending' && u.is_sender ? `<button class="btn-outline btn-sm" disabled>⏳ Request Sent</button>` :
+                      u.connection_status === 'pending' && !u.is_sender ? `<button class="btn-primary btn-sm btn-accent" onclick="acceptFromNotif(${u.id})">Accept Request</button>` :
+                      `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id}, this)">+ Connect</button>`}
                 </div>`;
 
     if (!u.is_restricted) {

@@ -641,6 +641,12 @@ def get_user(user_id):
         '''SELECT id FROM connections WHERE ((sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)) AND status='accepted' ''',
         (session['user_id'], user_id, user_id, session['user_id'])).fetchone()
     u['is_connected'] = bool(is_connected)
+    # Check pending status
+    conn_row = conn.execute(
+        '''SELECT status, sender_id FROM connections WHERE (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)''',
+        (session['user_id'], user_id, user_id, session['user_id'])).fetchone()
+    u['connection_status'] = conn_row['status'] if conn_row else None
+    u['is_sender'] = conn_row['sender_id'] == session['user_id'] if conn_row else False
     u['connections_count'] = conn.execute(
         '''SELECT COUNT(*) as c FROM connections WHERE (sender_id=? OR receiver_id=?) AND status='accepted' ''',
         (user_id, user_id)).fetchone()['c']
