@@ -1682,28 +1682,70 @@ function closeChatPlusMenu() {
     if (menu) menu.classList.remove('open');
 }
 
-function openDeliveryOptions() {
+function openScheduleMsg() {
     closeChatPlusMenu();
-    const time = prompt('Schedule message (YYYY-MM-DD HH:MM):');
-    if (time) {
-        const input = document.getElementById('inlineChatInput');
-        const msg = input.value.trim();
-        if (!msg) { showToast('Type a message first'); return; }
-        const body = { message: msg, scheduled_at: time };
-        if (currentGroupId) {
-            fetch(`/api/groups/${currentGroupId}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-        } else if (currentChatUserId) {
-            body.receiver_id = currentChatUserId;
-            fetch('/api/messages/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-        }
-        input.value = '';
-        showToast('Message scheduled!');
+    const msg = document.getElementById('inlineChatInput').value.trim();
+    if (!msg) { showToast('Type a message first'); return; }
+    // Set default date/time to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('schedDate').value = tomorrow.toISOString().split('T')[0];
+    document.getElementById('schedTime').value = '09:00';
+    document.getElementById('scheduleSheet').classList.add('open');
+}
+
+function closeScheduleSheet() {
+    document.getElementById('scheduleSheet').classList.remove('open');
+}
+
+async function sendScheduledMsg() {
+    const msg = document.getElementById('inlineChatInput').value.trim();
+    if (!msg) { showToast('Type a message first'); return; }
+    const date = document.getElementById('schedDate').value;
+    const time = document.getElementById('schedTime').value;
+    if (!date || !time) { showToast('Pick date and time'); return; }
+    const scheduled_at = `${date} ${time}:00`;
+    const body = { message: msg, scheduled_at };
+    if (currentGroupId) {
+        await fetch(`/api/groups/${currentGroupId}/messages`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    } else if (currentChatUserId) {
+        body.receiver_id = currentChatUserId;
+        await fetch('/api/messages/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     }
+    document.getElementById('inlineChatInput').value = '';
+    closeScheduleSheet();
+    showToast(`Message scheduled for ${date} ${time}`);
+}
+
+let deliveryOpts = { readReceipt: true, priority: false, silent: false };
+
+function openDeliveryOpts() {
+    closeChatPlusMenu();
+    document.getElementById('optReadReceipt').checked = deliveryOpts.readReceipt;
+    document.getElementById('optPriority').checked = deliveryOpts.priority;
+    document.getElementById('optSilent').checked = deliveryOpts.silent;
+    document.getElementById('deliverySheet').classList.add('open');
+}
+
+function closeDeliverySheet() {
+    document.getElementById('deliverySheet').classList.remove('open');
+}
+
+function applyDeliveryOpts() {
+    deliveryOpts.readReceipt = document.getElementById('optReadReceipt').checked;
+    deliveryOpts.priority = document.getElementById('optPriority').checked;
+    deliveryOpts.silent = document.getElementById('optSilent').checked;
+    closeDeliverySheet();
+    let status = [];
+    if (deliveryOpts.priority) status.push('🔴 Priority');
+    if (deliveryOpts.silent) status.push('🔕 Silent');
+    if (!deliveryOpts.readReceipt) status.push('No read receipts');
+    showToast(status.length ? status.join(', ') + ' applied' : 'Default delivery');
 }
 
 function recordVideoClip() {
     closeChatPlusMenu();
-    showToast('Video recording coming soon!');
+    showToast('🎥 Video recording coming soon!');
 }
 
 // ─── CUSTOM CONFIRM DIALOG ───
