@@ -498,8 +498,30 @@ button { font-family:inherit; }
 .pstat .lbl { font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; }
 .profile-skills { display:flex; flex-wrap:wrap; gap:0.4rem; margin:1rem 0; }
 .skill-tag { background:var(--primary); color:white; padding:0.3rem 0.75rem; border-radius:1rem; font-size:0.8rem; font-weight:600; }
-.profile-links { display:flex; gap:1rem; margin:1rem 0; }
+.profile-links { display:flex; gap:1rem; margin:0; flex-wrap:wrap; }
 .profile-links a { color:var(--accent); text-decoration:none; font-weight:600; font-size:0.9rem; }
+
+/* Profile sections */
+.profile-section {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:1.25rem; margin-top:0.75rem;
+}
+.profile-section-header {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;
+    font-size:1rem; font-weight:700;
+}
+.section-edit-btn {
+    background:none; border:none; color:var(--accent); font-size:0.85rem;
+    cursor:pointer; font-weight:600; padding:0.25rem 0.5rem; border-radius:var(--radius);
+}
+.section-edit-btn:hover { background:var(--bg); }
+.profile-entry {
+    padding:0.6rem 0; border-bottom:1px solid var(--border);
+}
+.profile-entry:last-child { border-bottom:none; }
+.entry-title { font-weight:600; font-size:0.95rem; }
+.entry-meta { font-size:0.8rem; color:var(--text-secondary); margin-top:0.1rem; }
+.entry-desc { font-size:0.85rem; color:var(--text-secondary); margin-top:0.25rem; line-height:1.4; }
 .referral-toggle {
     display:flex; align-items:center; gap:0.75rem; margin:1rem 0;
     padding:1rem; background:#f8f9fa; border-radius:var(--radius);

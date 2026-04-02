@@ -1047,101 +1047,300 @@ async function loadProfile() {
     const p = await res.json();
     if (p.error) { container.innerHTML = '<p style="color:#dc3545;">Failed to load profile</p>'; return; }
 
+    const workHistory = p.work_history || [];
+    const education = p.education || [];
+    const projects = p.projects || [];
+    const certs = p.certifications || [];
+    const accomplishments = p.accomplishments || [];
+    const personalInfo = p.personal_info || {};
+
     container.innerHTML = `
         <div class="profile-card">
             <div class="profile-top">
                 <div class="profile-avatar">${(p.username || 'U')[0].toUpperCase()}</div>
                 <div class="profile-info">
                     <h2>${esc(p.username)}</h2>
+                    ${p.headline ? `<div style="font-size:1rem;color:var(--text);margin-bottom:0.15rem;">${esc(p.headline)}</div>` : ''}
                     <div class="company-role">${esc(p.company || '')} ${p.role ? '· ' + esc(p.role) : ''}</div>
-                    ${p.experience ? `<div style="color:#666;font-size:0.9rem;">${p.experience} years experience</div>` : ''}
-                    ${p.bio ? `<div class="bio">${esc(p.bio)}</div>` : ''}
+                    ${p.location ? `<div style="color:#999;font-size:0.85rem;">📍 ${esc(p.location)}</div>` : ''}
+                    ${p.tagline ? `<div style="color:var(--accent);font-size:0.85rem;font-style:italic;margin-top:0.25rem;">"${esc(p.tagline)}"</div>` : ''}
                 </div>
             </div>
-
             <div class="profile-stats">
                 <div class="pstat"><div class="num">${p.connections_count || 0}</div><div class="lbl">Connections</div></div>
                 <div class="pstat"><div class="num">${p.posts_count || 0}</div><div class="lbl">Posts</div></div>
+                <div class="pstat"><div class="num">${p.experience || 0}</div><div class="lbl">Years Exp</div></div>
             </div>
-
-            ${p.skills ? `<div class="profile-skills">${p.skills.split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div>` : ''}
-
-            <div class="profile-links">
-                ${p.linkedin ? `<a href="${esc(p.linkedin)}" target="_blank">🔗 LinkedIn</a>` : ''}
-                ${p.github ? `<a href="${esc(p.github)}" target="_blank">💻 GitHub</a>` : ''}
-            </div>
-
-            <div class="profile-resume-section">
-                <h3 style="font-size:1rem;margin-bottom:0.5rem;">📄 Resume</h3>
-                ${p.resume ? `<div style="display:flex;gap:0.5rem;align-items:center;">
-                    <span style="color:#28a745;font-size:0.9rem;">✓ Resume uploaded</span>
-                    <button class="btn-outline btn-sm" onclick="viewMyResume()">View</button>
-                    <button class="btn-outline btn-sm" onclick="document.getElementById('resumeInput').click()">Replace</button>
-                </div>` : `<button class="btn-outline" onclick="document.getElementById('resumeInput').click()">Upload Resume (PDF)</button>`}
-                <input type="file" id="resumeInput" accept=".pdf" style="display:none;" onchange="handleResumeUpload(event)" />
-            </div>
-
-            <div class="referral-toggle">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="refToggle" ${p.available_for_referral ? 'checked' : ''} onchange="toggleReferralAvailability()">
-                    <span class="toggle-slider"></span>
-                </label>
-                <span style="font-weight:600;">Available for referrals</span>
-            </div>
-
-            <div class="referral-toggle">
-                <label class="toggle-switch">
-                    <input type="checkbox" id="privacyToggle" ${p.is_private ? 'checked' : ''} onchange="togglePrivacy()">
-                    <span class="toggle-slider"></span>
-                </label>
-                <div style="flex:1;min-width:0;">
-                    <span style="font-weight:600;">Private Profile</span>
-                    <div style="font-size:0.8rem;color:#999;">Only connections can see your full profile & resume</div>
-                </div>
-            </div>
-
-            <button class="btn-primary" onclick="openEditProfile()" style="margin-top:1rem;">Edit Profile</button>
         </div>
 
-        <div id="editProfileForm" style="display:none;margin-top:1rem;" class="profile-card">
-            <h3 style="margin-bottom:1rem;">Edit Profile</h3>
-            <div class="form-group"><label>Full Name</label><input type="text" id="editName" value="${esc(p.username)}" /></div>
-            <div class="form-group"><label>Company</label><input type="text" id="editCompany" value="${esc(p.company || '')}" /></div>
-            <div class="form-group"><label>Role</label><input type="text" id="editRole" value="${esc(p.role || '')}" /></div>
-            <div class="form-group"><label>Experience (years)</label><input type="number" id="editExp" value="${p.experience || 0}" /></div>
-            <div class="form-group"><label>Bio</label><textarea id="editBio" rows="3">${esc(p.bio || '')}</textarea></div>
-            <div class="form-group"><label>Skills (comma separated)</label><input type="text" id="editSkills" value="${esc(p.skills || '')}" /></div>
-            <div class="form-group"><label>LinkedIn URL</label><input type="text" id="editLinkedin" value="${esc(p.linkedin || '')}" /></div>
-            <div class="form-group"><label>GitHub URL</label><input type="text" id="editGithub" value="${esc(p.github || '')}" /></div>
-            <div style="display:flex;gap:0.5rem;">
-                <button class="btn-primary" onclick="saveProfile()">Save</button>
-                <button class="btn-outline" onclick="document.getElementById('editProfileForm').style.display='none'">Cancel</button>
+        <!-- About -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🧑 About</span><button class="section-edit-btn" onclick="openProfileSection('about')">✏️</button></div>
+            ${p.bio ? `<p style="line-height:1.5;color:var(--text-secondary);">${esc(p.bio)}</p>` : '<p style="color:#999;">Add a summary about yourself</p>'}
+        </div>
+
+        <!-- Expertise -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🛠️ Expertise</span><button class="section-edit-btn" onclick="openProfileSection('skills')">✏️</button></div>
+            ${p.skills ? `<div class="profile-skills">${p.skills.split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div>` : '<p style="color:#999;">Add your key skills</p>'}
+        </div>
+
+        <!-- Work Journey -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>💼 Work Journey</span><button class="section-edit-btn" onclick="openProfileSection('work')">+ Add</button></div>
+            ${workHistory.length > 0 ? workHistory.map(w => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(w.title || '')} ${w.company ? 'at ' + esc(w.company) : ''}</div>
+                    <div class="entry-meta">${esc(w.period || '')} ${w.location ? '· ' + esc(w.location) : ''}</div>
+                    ${w.description ? `<div class="entry-desc">${esc(w.description)}</div>` : ''}
+                </div>
+            `).join('') : '<p style="color:#999;">Share your work experience</p>'}
+        </div>
+
+        <!-- Learning Path -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🎓 Learning Path</span><button class="section-edit-btn" onclick="openProfileSection('education')">+ Add</button></div>
+            ${education.length > 0 ? education.map(e => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(e.degree || '')} ${e.field ? '— ' + esc(e.field) : ''}</div>
+                    <div class="entry-meta">${esc(e.institution || '')} ${e.year ? '· ' + esc(e.year) : ''}</div>
+                </div>
+            `).join('') : '<p style="color:#999;">Add your education background</p>'}
+        </div>
+
+        <!-- Builds & Projects -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🚀 Builds & Projects</span><button class="section-edit-btn" onclick="openProfileSection('projects')">+ Add</button></div>
+            ${projects.length > 0 ? projects.map(pr => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(pr.name || '')}</div>
+                    ${pr.description ? `<div class="entry-desc">${esc(pr.description)}</div>` : ''}
+                    ${pr.link ? `<a href="${esc(pr.link)}" target="_blank" style="font-size:0.8rem;color:var(--accent);">View →</a>` : ''}
+                </div>
+            `).join('') : '<p style="color:#999;">Showcase your projects</p>'}
+        </div>
+
+        <!-- Credentials -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>📜 Credentials</span><button class="section-edit-btn" onclick="openProfileSection('certs')">+ Add</button></div>
+            ${certs.length > 0 ? certs.map(c => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(c.name || '')}</div>
+                    <div class="entry-meta">${esc(c.issuer || '')} ${c.year ? '· ' + esc(c.year) : ''}</div>
+                </div>
+            `).join('') : '<p style="color:#999;">Add certifications & licenses</p>'}
+        </div>
+
+        <!-- Milestones -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🏆 Milestones</span><button class="section-edit-btn" onclick="openProfileSection('milestones')">+ Add</button></div>
+            ${accomplishments.length > 0 ? accomplishments.map(a => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(a.title || '')}</div>
+                    ${a.description ? `<div class="entry-desc">${esc(a.description)}</div>` : ''}
+                </div>
+            `).join('') : '<p style="color:#999;">Highlight your achievements</p>'}
+        </div>
+
+        <!-- Career Vision -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🎯 Career Vision</span><button class="section-edit-btn" onclick="openProfileSection('career')">✏️</button></div>
+            ${p.career_goals ? `<p style="line-height:1.5;color:var(--text-secondary);">${esc(p.career_goals)}</p>` : '<p style="color:#999;">What are you working towards?</p>'}
+        </div>
+
+        <!-- Links & Socials -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🔗 Links & Socials</span><button class="section-edit-btn" onclick="openProfileSection('links')">✏️</button></div>
+            <div class="profile-links">
+                ${p.linkedin ? `<a href="${esc(p.linkedin)}" target="_blank">LinkedIn</a>` : ''}
+                ${p.github ? `<a href="${esc(p.github)}" target="_blank">GitHub</a>` : ''}
+                ${!p.linkedin && !p.github ? '<p style="color:#999;">Add your social links</p>' : ''}
+            </div>
+        </div>
+
+        <!-- Resume -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>📄 Resume</span></div>
+            ${p.resume ? `<div style="display:flex;gap:0.5rem;align-items:center;">
+                <span style="color:var(--success);font-size:0.9rem;">✓ Uploaded</span>
+                <button class="btn-outline btn-sm" onclick="viewMyResume()">View</button>
+                <button class="btn-outline btn-sm" onclick="document.getElementById('resumeInput').click()">Replace</button>
+            </div>` : `<button class="btn-outline btn-sm" onclick="document.getElementById('resumeInput').click()">Upload Resume (PDF)</button>`}
+            <input type="file" id="resumeInput" accept=".pdf" style="display:none;" onchange="handleResumeUpload(event)" />
+        </div>
+
+        <!-- Settings -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>⚙️ Settings</span></div>
+            <div class="referral-toggle" style="margin:0;">
+                <label class="toggle-switch"><input type="checkbox" id="refToggle" ${p.available_for_referral ? 'checked' : ''} onchange="toggleReferralAvailability()"><span class="toggle-slider"></span></label>
+                <span style="font-weight:600;">Available for referrals</span>
+            </div>
+            <div class="referral-toggle" style="margin:0.5rem 0 0;">
+                <label class="toggle-switch"><input type="checkbox" id="privacyToggle" ${p.is_private ? 'checked' : ''} onchange="togglePrivacy()"><span class="toggle-slider"></span></label>
+                <div style="flex:1;min-width:0;"><span style="font-weight:600;">Private Profile</span><div style="font-size:0.8rem;color:#999;">Only connections see full details</div></div>
             </div>
         </div>
     `;
+    window._profileData = p;
 }
 
-function openEditProfile() { document.getElementById('editProfileForm').style.display = 'block'; }
+function openEditProfile() { openProfileSection('about'); }
 
 async function saveProfile() {
+    const p = window._profileData || {};
     const data = {
-        username: document.getElementById('editName').value.trim(),
-        company: document.getElementById('editCompany').value.trim(),
-        role: document.getElementById('editRole').value.trim(),
-        experience: parseInt(document.getElementById('editExp').value) || 0,
-        bio: document.getElementById('editBio').value.trim(),
-        skills: document.getElementById('editSkills').value.trim(),
-        linkedin: document.getElementById('editLinkedin').value.trim(),
-        github: document.getElementById('editGithub').value.trim(),
+        username: document.getElementById('editName')?.value.trim() || p.username,
+        company: document.getElementById('editCompany')?.value.trim() || p.company,
+        role: document.getElementById('editRole')?.value.trim() || p.role,
+        experience: parseInt(document.getElementById('editExp')?.value) || p.experience || 0,
+        bio: document.getElementById('editBio')?.value.trim() || p.bio,
+        skills: document.getElementById('editSkills')?.value.trim() || p.skills,
+        linkedin: document.getElementById('editLinkedin')?.value.trim() || p.linkedin,
+        github: document.getElementById('editGithub')?.value.trim() || p.github,
+        headline: document.getElementById('editHeadline')?.value.trim() || p.headline,
+        tagline: document.getElementById('editTagline')?.value.trim() || p.tagline,
+        location: document.getElementById('editLocation')?.value.trim() || p.location,
+        career_goals: document.getElementById('editCareer')?.value.trim() || p.career_goals,
         available_for_referral: document.getElementById('refToggle')?.checked || false,
-        is_private: document.getElementById('privacyToggle')?.checked || false
+        is_private: document.getElementById('privacyToggle')?.checked || false,
+        work_history: p.work_history || [],
+        education: p.education || [],
+        projects: p.projects || [],
+        certifications: p.certifications || [],
+        accomplishments: p.accomplishments || [],
+        personal_info: p.personal_info || {}
     };
     try {
         const res = await fetch('/api/profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
-        const result = await res.json();
-        if (res.ok) { alert('Profile updated!'); loadProfile(); }
-        else alert('Error: ' + (result.error || 'Failed'));
-    } catch (e) { alert('Failed: ' + e.message); }
+        if (res.ok) { showToast('Profile updated!'); loadProfile(); }
+        else { const r = await res.json(); showToast('Error: ' + (r.error || 'Failed')); }
+    } catch (e) { showToast('Failed: ' + e.message); }
+}
+
+function openProfileSection(section) {
+    const p = window._profileData || {};
+    let title = '', body = '';
+    switch(section) {
+        case 'about':
+            title = '🧑 Edit Profile';
+            body = `
+                <div class="form-group"><label>Full Name</label><input type="text" id="editName" value="${esc(p.username || '')}" /></div>
+                <div class="form-group"><label>Headline</label><input type="text" id="editHeadline" value="${esc(p.headline || '')}" placeholder="e.g. Senior Developer | Open Source Enthusiast" /></div>
+                <div class="form-group"><label>Tagline</label><input type="text" id="editTagline" value="${esc(p.tagline || '')}" placeholder="A short motto or quote" /></div>
+                <div class="form-group"><label>Company</label><input type="text" id="editCompany" value="${esc(p.company || '')}" /></div>
+                <div class="form-group"><label>Role</label><input type="text" id="editRole" value="${esc(p.role || '')}" /></div>
+                <div class="form-group"><label>Location</label><input type="text" id="editLocation" value="${esc(p.location || '')}" placeholder="City, Country" /></div>
+                <div class="form-group"><label>Experience (years)</label><input type="number" id="editExp" value="${p.experience || 0}" /></div>
+                <div class="form-group"><label>About Me</label><textarea id="editBio" rows="3">${esc(p.bio || '')}</textarea></div>
+                <button class="btn-primary" onclick="saveProfile(); closeProfileSheet();">Save</button>`;
+            break;
+        case 'skills':
+            title = '🛠️ Expertise';
+            body = `
+                <div class="form-group"><label>Skills (comma separated)</label><input type="text" id="editSkills" value="${esc(p.skills || '')}" placeholder="React, Python, Leadership..." /></div>
+                <button class="btn-primary" onclick="saveProfile(); closeProfileSheet();">Save</button>`;
+            break;
+        case 'work':
+            title = '💼 Add Work Experience';
+            body = `
+                <div class="form-group"><label>Job Title</label><input type="text" id="workTitle" /></div>
+                <div class="form-group"><label>Company</label><input type="text" id="workCompany" /></div>
+                <div class="form-group"><label>Period</label><input type="text" id="workPeriod" placeholder="e.g. Jan 2022 - Present" /></div>
+                <div class="form-group"><label>Location</label><input type="text" id="workLocation" /></div>
+                <div class="form-group"><label>Description</label><textarea id="workDesc" rows="2"></textarea></div>
+                <button class="btn-primary" onclick="addProfileEntry('work_history', {title:gv('workTitle'),company:gv('workCompany'),period:gv('workPeriod'),location:gv('workLocation'),description:gv('workDesc')})">Add</button>`;
+            break;
+        case 'education':
+            title = '🎓 Add Education';
+            body = `
+                <div class="form-group"><label>Degree</label><input type="text" id="eduDegree" placeholder="e.g. B.Tech, MBA" /></div>
+                <div class="form-group"><label>Field of Study</label><input type="text" id="eduField" /></div>
+                <div class="form-group"><label>Institution</label><input type="text" id="eduInst" /></div>
+                <div class="form-group"><label>Year</label><input type="text" id="eduYear" placeholder="e.g. 2020" /></div>
+                <button class="btn-primary" onclick="addProfileEntry('education', {degree:gv('eduDegree'),field:gv('eduField'),institution:gv('eduInst'),year:gv('eduYear')})">Add</button>`;
+            break;
+        case 'projects':
+            title = '🚀 Add Project';
+            body = `
+                <div class="form-group"><label>Project Name</label><input type="text" id="projName" /></div>
+                <div class="form-group"><label>Description</label><textarea id="projDesc" rows="2"></textarea></div>
+                <div class="form-group"><label>Link (optional)</label><input type="text" id="projLink" placeholder="https://..." /></div>
+                <button class="btn-primary" onclick="addProfileEntry('projects', {name:gv('projName'),description:gv('projDesc'),link:gv('projLink')})">Add</button>`;
+            break;
+        case 'certs':
+            title = '📜 Add Credential';
+            body = `
+                <div class="form-group"><label>Certification Name</label><input type="text" id="certName" /></div>
+                <div class="form-group"><label>Issuing Organization</label><input type="text" id="certIssuer" /></div>
+                <div class="form-group"><label>Year</label><input type="text" id="certYear" /></div>
+                <button class="btn-primary" onclick="addProfileEntry('certifications', {name:gv('certName'),issuer:gv('certIssuer'),year:gv('certYear')})">Add</button>`;
+            break;
+        case 'milestones':
+            title = '🏆 Add Milestone';
+            body = `
+                <div class="form-group"><label>Title</label><input type="text" id="mileTitle" /></div>
+                <div class="form-group"><label>Description</label><textarea id="mileDesc" rows="2"></textarea></div>
+                <button class="btn-primary" onclick="addProfileEntry('accomplishments', {title:gv('mileTitle'),description:gv('mileDesc')})">Add</button>`;
+            break;
+        case 'career':
+            title = '🎯 Career Vision';
+            body = `
+                <div class="form-group"><label>What are you working towards?</label><textarea id="editCareer" rows="3">${esc(p.career_goals || '')}</textarea></div>
+                <button class="btn-primary" onclick="saveProfile(); closeProfileSheet();">Save</button>`;
+            break;
+        case 'links':
+            title = '🔗 Links & Socials';
+            body = `
+                <div class="form-group"><label>LinkedIn URL</label><input type="text" id="editLinkedin" value="${esc(p.linkedin || '')}" /></div>
+                <div class="form-group"><label>GitHub URL</label><input type="text" id="editGithub" value="${esc(p.github || '')}" /></div>
+                <button class="btn-primary" onclick="saveProfile(); closeProfileSheet();">Save</button>`;
+            break;
+    }
+    showProfileSheet(title, body);
+}
+
+function gv(id) { return document.getElementById(id)?.value.trim() || ''; }
+
+function showProfileSheet(title, body) {
+    let sheet = document.getElementById('profileEditSheet');
+    if (!sheet) {
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="profileEditSheet" class="bottom-sheet-overlay" onclick="if(event.target===this)closeProfileSheet()">
+                <div class="bottom-sheet" style="max-width:500px;">
+                    <div class="bottom-sheet-handle" onclick="closeProfileSheet()"><div class="handle-bar"></div></div>
+                    <div class="bottom-sheet-header"><h3 id="profileSheetTitle"></h3><button class="close-btn" onclick="closeProfileSheet()">&times;</button></div>
+                    <div class="bottom-sheet-body" id="profileSheetBody" style="padding:1rem;"></div>
+                </div>
+            </div>`);
+        sheet = document.getElementById('profileEditSheet');
+    }
+    document.getElementById('profileSheetTitle').textContent = title;
+    document.getElementById('profileSheetBody').innerHTML = body;
+    sheet.classList.add('open');
+}
+
+function closeProfileSheet() {
+    const sheet = document.getElementById('profileEditSheet');
+    if (sheet) sheet.classList.remove('open');
+}
+
+async function addProfileEntry(field, entry) {
+    const p = window._profileData || {};
+    const arr = p[field] || [];
+    arr.push(entry);
+    p[field] = arr;
+    window._profileData = p;
+    const data = {...p};
+    for (const f of ['work_history','education','projects','certifications','accomplishments','personal_info']) {
+        if (data[f] && typeof data[f] === 'object') data[f] = JSON.stringify(data[f]);
+    }
+    data.available_for_referral = document.getElementById('refToggle')?.checked || false;
+    data.is_private = document.getElementById('privacyToggle')?.checked || false;
+    await fetch('/api/profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    closeProfileSheet();
+    showToast('Added!');
+    loadProfile();
 }
 
 async function toggleReferralAvailability() {

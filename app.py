@@ -376,6 +376,15 @@ def init_db():
             conn.execute(f"ALTER TABLE messages ADD COLUMN {col} {ctype}")
         except Exception:
             pass
+    # Profile enhancement columns (stored as JSON text)
+    for col, ctype in [('headline', 'TEXT'), ('tagline', 'TEXT'), ('location', 'TEXT'),
+                        ('work_history', 'TEXT'), ('education', 'TEXT'), ('projects', 'TEXT'),
+                        ('certifications', 'TEXT'), ('accomplishments', 'TEXT'),
+                        ('career_goals', 'TEXT'), ('personal_info', 'TEXT')]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype}")
+        except Exception:
+            pass
 
     # Seed test users if they don't exist
     test_users = [
@@ -564,16 +573,22 @@ def get_profile():
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
     user = conn.execute('''SELECT id, email, username, company, role, experience, bio, skills,
-                           linkedin, github, available_for_referral, profile_photo, resume, is_private, created_at
+                           linkedin, github, available_for_referral, profile_photo, resume, is_private, created_at,
+                           headline, tagline, location, work_history, education, projects,
+                           certifications, accomplishments, career_goals, personal_info
                            FROM users WHERE id=?''', (session['user_id'],)).fetchone()
     u = dict(user)
-    # Connection count
     u['connections_count'] = conn.execute(
         '''SELECT COUNT(*) as c FROM connections WHERE (sender_id=? OR receiver_id=?) AND status='accepted' ''',
         (session['user_id'], session['user_id'])).fetchone()['c']
-    # Posts count
     u['posts_count'] = conn.execute('SELECT COUNT(*) as c FROM posts WHERE user_id=?', (session['user_id'],)).fetchone()['c']
     conn.close()
+    # Parse JSON fields
+    for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info']:
+        try:
+            u[f] = json.loads(u[f]) if u[f] else None
+        except:
+            u[f] = None
     return jsonify(u)
 
 @app.route('/api/profile', methods=['PUT'])
@@ -583,14 +598,24 @@ def update_profile():
     try:
         data = request.json
         conn = get_db()
+        # Serialize JSON fields
+        for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info']:
+            if f in data and isinstance(data[f], (list, dict)):
+                data[f] = json.dumps(data[f])
         conn.execute('''UPDATE users SET username=?, company=?, role=?, experience=?,
-                        bio=?, skills=?, linkedin=?, github=?, available_for_referral=?, is_private=?
+                        bio=?, skills=?, linkedin=?, github=?, available_for_referral=?, is_private=?,
+                        headline=?, tagline=?, location=?, work_history=?, education=?, projects=?,
+                        certifications=?, accomplishments=?, career_goals=?, personal_info=?
                         WHERE id=?''',
                      (data.get('username'), data.get('company'), data.get('role'),
                       data.get('experience', 0), data.get('bio'), data.get('skills'),
                       data.get('linkedin'), data.get('github'),
                       1 if data.get('available_for_referral') else 0,
                       1 if data.get('is_private') else 0,
+                      data.get('headline'), data.get('tagline'), data.get('location'),
+                      data.get('work_history'), data.get('education'), data.get('projects'),
+                      data.get('certifications'), data.get('accomplishments'),
+                      data.get('career_goals'), data.get('personal_info'),
                       session['user_id']))
         conn.commit()
         conn.close()
