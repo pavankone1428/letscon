@@ -1960,9 +1960,97 @@ async function openGroupChat(groupId, name) {
     const chatView = document.getElementById('messagesChatView');
     chatView.style.display = 'flex';
     document.getElementById('chatUserAvatar').textContent = name[0].toUpperCase();
-    document.getElementById('inlineChatTitle').innerHTML = `<span>${esc(name)}</span> <span style="font-size:0.75rem;color:#999;font-weight:400;">group</span>`;
+    document.getElementById('inlineChatTitle').innerHTML = `<span style="cursor:pointer;" onclick="openGroupInfo(${groupId})">${esc(name)}</span> <span style="font-size:0.75rem;color:#999;font-weight:400;">group</span>`;
     document.getElementById('replyPreview').style.display = 'none';
     loadGroupMessages();
+    loadGroupMembersForMention(groupId);
+}
+
+let groupMembersForMention = [];
+
+async function loadGroupMembersForMention(groupId) {
+    try {
+        const res = await fetch(`/api/groups/${groupId}`);
+        const data = await res.json();
+        groupMembersForMention = (data.members || []).map(m => ({id: m.user_id, username: m.username, company: m.company || '', role: m.user_role || ''}));
+    } catch { groupMembersForMention = []; }
+}
+
+async function openGroupInfo(groupId) {
+    const res = await fetch(`/api/groups/${groupId}`);
+    const g = await res.json();
+    if (g.error) return;
+    const members = g.members || [];
+    const isAdmin = members.some(m => m.user_id === (window._profileData?.id) && m.role === 'admin');
+
+    let html = `
+        <div style="text-align:center;padding-bottom:1rem;border-bottom:1px solid var(--border);">
+            <div style="width:64px;height:64px;border-radius:50%;background:${g.avatar_color || '#7c3aed'};color:white;display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:700;margin:0 auto;">${g.name[0].toUpperCase()}</div>
+            <h3 style="margin-top:0.5rem;">${esc(g.name)}</h3>
+            ${g.description ? `<p style="color:var(--text-secondary);font-size:0.85rem;">${esc(g.description)}</p>` : ''}
+            <p style="color:#999;font-size:0.8rem;">${members.length} members · Max 150</p>
+        </div>
+        <div style="padding:0.75rem 0;">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:0.5rem;">👥 Members (${members.length})</div>
+            ${members.map(m => `
+                <div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;">
+                    <div class="mention-avatar">${m.username[0].toUpperCase()}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:0.9rem;">${esc(m.username)} ${m.role === 'admin' ? '<span style="font-size:0.7rem;color:var(--accent);font-weight:700;">ADMIN</span>' : ''}</div>
+                        <div style="font-size:0.75rem;color:#999;">${esc(m.company || '')} ${m.user_role ? '· ' + esc(m.user_role) : ''}</div>
+                    </div>
+                    ${isAdmin && m.role !== 'admin' ? `<button class="btn-outline btn-sm" style="font-size:0.7rem;padding:0.25rem 0.5rem;" onclick="removeGroupMember(${groupId}, ${m.user_id})">Remove</button>` : ''}
+                </div>
+            `).join('')}
+        </div>
+        ${isAdmin ? `<button class="btn-primary btn-sm" style="width:100%;margin-bottom:0.5rem;" onclick="addMemberToGroup(${groupId})">+ Add Member</button>` : ''}
+        <div style="display:flex;flex-direction:column;gap:0.5rem;padding-top:0.75rem;border-top:1px solid var(--border);">
+            <button class="btn-outline btn-sm" style="width:100%;color:var(--danger);border-color:var(--danger);" onclick="leaveGroup(${groupId})">🚪 Exit Group</button>
+            <button class="btn-outline btn-sm" style="width:100%;" onclick="openReportModal('group', ${groupId})">⚠️ Report Group</button>
+        </div>
+    `;
+    showProfileSheet(`${esc(g.name)}`, html);
+}
+
+async function removeGroupMember(groupId, userId) {
+    const ok = await customConfirm('Remove this member?');
+    if (!ok) return;
+    await fetch(`/api/groups/${groupId}/members/${userId}`, { method:'DELETE' });
+    showToast('Member removed');
+    openGroupInfo(groupId);
+}
+
+async function leaveGroup(groupId) {
+    const ok = await customConfirm('Leave this group?');
+    if (!ok) return;
+    await fetch(`/api/groups/${groupId}/leave`, { method:'POST' });
+    showToast('Left group');
+    closeProfileSheet();
+    backToConversations();
+    loadGroups();
+}
+
+async function addMemberToGroup(groupId) {
+    const res = await fetch('/api/connections');
+    const conns = await res.json();
+    let html = '<div style="padding:0.5rem;">';
+    html += conns.map(c => `
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;">
+            <div class="mention-avatar">${c.username[0].toUpperCase()}</div>
+            <div style="flex:1;"><div style="font-weight:600;font-size:0.9rem;">${esc(c.username)}</div></div>
+            <button class="btn-primary btn-sm" style="font-size:0.75rem;padding:0.25rem 0.5rem;" onclick="doAddMember(${groupId}, ${c.id}, this)">Add</button>
+        </div>
+    `).join('') || '<p style="color:#999;">No connections to add</p>';
+    html += '</div>';
+    showProfileSheet('+ Add Member', html);
+}
+
+async function doAddMember(groupId, userId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '...'; }
+    const res = await fetch(`/api/groups/${groupId}/members`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id: userId}) });
+    const data = await res.json();
+    if (btn) { btn.innerHTML = data.error ? 'Failed' : '✓'; }
+    if (!data.error) showToast('Member added');
 }
 
 async function loadGroupMessages() {
@@ -2150,8 +2238,13 @@ function handleMentionInput(input, dropdownId) {
 
     if (match) {
         const query = match[1].toLowerCase();
-        if (mentionConnections.length === 0) loadMentionConnections();
-        const filtered = mentionConnections.filter(c =>
+        // Use group members if in group chat, otherwise connections
+        let pool = mentionConnections;
+        if (currentGroupId && groupMembersForMention.length > 0 && dropdownId === 'chatMentionDropdown') {
+            pool = groupMembersForMention;
+        }
+        if (pool.length === 0) loadMentionConnections();
+        const filtered = pool.filter(c =>
             c.username.toLowerCase().includes(query)
         ).slice(0, 8);
 

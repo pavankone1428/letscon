@@ -1754,6 +1754,20 @@ def leave_group(group_id):
     conn.close()
     return jsonify({'message': 'Left group'})
 
+@app.route('/api/groups/<int:group_id>/members/<int:user_id>', methods=['DELETE'])
+def remove_group_member(group_id, user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    role = conn.execute('SELECT role FROM group_members WHERE group_id=? AND user_id=?', (group_id, session['user_id'])).fetchone()
+    if not role or role['role'] != 'admin':
+        conn.close()
+        return jsonify({'error': 'Only admins can remove members'}), 403
+    conn.execute('DELETE FROM group_members WHERE group_id=? AND user_id=?', (group_id, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Member removed'})
+
 # ─── CHAT FILE UPLOAD & SCHEDULED MESSAGES ───
 
 @app.route('/api/messages/send', methods=['POST'])
