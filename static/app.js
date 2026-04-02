@@ -1053,6 +1053,21 @@ async function loadProfile() {
     const certs = p.certifications || [];
     const accomplishments = p.accomplishments || [];
     const personalInfo = p.personal_info || {};
+    const internships = p.internships || [];
+    const isStudent = p.account_type === 'student';
+
+    // Calculate profile completion
+    const sections = isStudent
+        ? [p.headline, p.bio, p.skills, p.college, p.degree_pursuing, p.graduation_year, p.cgpa,
+           education.length > 0, projects.length > 0, internships.length > 0, certs.length > 0,
+           p.career_goals, p.linkedin || p.github]
+        : [p.headline, p.bio, p.company, p.role, p.skills, p.location,
+           workHistory.length > 0, education.length > 0, projects.length > 0,
+           certs.length > 0, accomplishments.length > 0, p.career_goals, p.linkedin || p.github, p.resume];
+    const filled = sections.filter(Boolean).length;
+    const total = sections.length;
+    const pct = Math.round((filled / total) * 100);
+    const pctColor = pct >= 80 ? 'var(--success)' : pct >= 50 ? '#f59e0b' : 'var(--danger)';
 
     container.innerHTML = `
         <div class="profile-card">
@@ -1061,16 +1076,31 @@ async function loadProfile() {
                 <div class="profile-info">
                     <h2>${esc(p.username)}</h2>
                     ${p.headline ? `<div style="font-size:1rem;color:var(--text);margin-bottom:0.15rem;">${esc(p.headline)}</div>` : ''}
-                    <div class="company-role">${esc(p.company || '')} ${p.role ? '· ' + esc(p.role) : ''}</div>
+                    ${isStudent
+                        ? `<div class="company-role">🎓 ${esc(p.degree_pursuing || 'Student')} ${p.college ? 'at ' + esc(p.college) : ''}</div>`
+                        : `<div class="company-role">${esc(p.company || '')} ${p.role ? '· ' + esc(p.role) : ''}</div>`}
                     ${p.location ? `<div style="color:#999;font-size:0.85rem;">📍 ${esc(p.location)}</div>` : ''}
                     ${p.tagline ? `<div style="color:var(--accent);font-size:0.85rem;font-style:italic;margin-top:0.25rem;">"${esc(p.tagline)}"</div>` : ''}
+                    <div style="font-size:0.75rem;color:#999;margin-top:0.25rem;">${isStudent ? '🎓 Student Account' : '💼 Professional Account'}</div>
                 </div>
             </div>
             <div class="profile-stats">
                 <div class="pstat"><div class="num">${p.connections_count || 0}</div><div class="lbl">Connections</div></div>
                 <div class="pstat"><div class="num">${p.posts_count || 0}</div><div class="lbl">Posts</div></div>
-                <div class="pstat"><div class="num">${p.experience || 0}</div><div class="lbl">Years Exp</div></div>
+                <div class="pstat"><div class="num">${p.experience || 0}</div><div class="lbl">${isStudent ? 'Sem' : 'Years Exp'}</div></div>
             </div>
+        </div>
+
+        <!-- Profile Completion -->
+        <div class="profile-section" style="padding:1rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                <span style="font-weight:700;">Profile Strength</span>
+                <span style="font-weight:700;color:${pctColor};">${pct}%</span>
+            </div>
+            <div style="background:var(--border);border-radius:1rem;height:8px;overflow:hidden;">
+                <div style="background:${pctColor};height:100%;width:${pct}%;border-radius:1rem;transition:width 0.5s;"></div>
+            </div>
+            ${pct < 100 ? `<p style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.4rem;">Complete your profile to stand out! ${total - filled} section${total - filled > 1 ? 's' : ''} remaining.</p>` : `<p style="font-size:0.8rem;color:var(--success);margin-top:0.4rem;">🎉 Profile complete! You're all set.</p>`}
         </div>
 
         <!-- About -->
@@ -1085,7 +1115,26 @@ async function loadProfile() {
             ${p.skills ? `<div class="profile-skills">${p.skills.split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div>` : '<p style="color:#999;">Add your key skills</p>'}
         </div>
 
-        <!-- Work Journey -->
+        ${isStudent ? `
+        <!-- Student: Academic Info -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🏫 Academics</span><button class="section-edit-btn" onclick="openProfileSection('academics')">✏️</button></div>
+            ${p.college ? `<div class="profile-entry"><div class="entry-title">${esc(p.college)}</div><div class="entry-meta">${esc(p.degree_pursuing || '')} · Graduating ${esc(p.graduation_year || '')}</div>${p.cgpa ? `<div class="entry-desc">CGPA: ${esc(p.cgpa)}</div>` : ''}</div>` : '<p style="color:#999;">Add your academic details</p>'}
+        </div>
+
+        <!-- Student: Internships -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🏢 Internships</span><button class="section-edit-btn" onclick="openProfileSection('internships')">+ Add</button></div>
+            ${internships.length > 0 ? internships.map(w => `
+                <div class="profile-entry">
+                    <div class="entry-title">${esc(w.title || '')} at ${esc(w.company || '')}</div>
+                    <div class="entry-meta">${esc(w.period || '')}</div>
+                    ${w.description ? `<div class="entry-desc">${esc(w.description)}</div>` : ''}
+                </div>
+            `).join('') : '<p style="color:#999;">Add internship experience</p>'}
+        </div>
+        ` : `
+        <!-- Professional: Work Journey -->
         <div class="profile-section">
             <div class="profile-section-header"><span>💼 Work Journey</span><button class="section-edit-btn" onclick="openProfileSection('work')">+ Add</button></div>
             ${workHistory.length > 0 ? workHistory.map(w => `
@@ -1096,6 +1145,7 @@ async function loadProfile() {
                 </div>
             `).join('') : '<p style="color:#999;">Share your work experience</p>'}
         </div>
+        `}
 
         <!-- Learning Path -->
         <div class="profile-section">
@@ -1204,6 +1254,10 @@ async function saveProfile() {
         career_goals: document.getElementById('editCareer')?.value.trim() || p.career_goals,
         available_for_referral: document.getElementById('refToggle')?.checked || false,
         is_private: document.getElementById('privacyToggle')?.checked || false,
+        account_type: p.account_type || 'professional',
+        college: p.college, degree_pursuing: p.degree_pursuing,
+        graduation_year: p.graduation_year, cgpa: p.cgpa,
+        internships: p.internships || [],
         work_history: p.work_history || [],
         education: p.education || [],
         projects: p.projects || [],
@@ -1296,6 +1350,24 @@ function openProfileSection(section) {
                 <div class="form-group"><label>GitHub URL</label><input type="text" id="editGithub" value="${esc(p.github || '')}" /></div>
                 <button class="btn-primary" onclick="saveProfile(); closeProfileSheet();">Save</button>`;
             break;
+        case 'academics':
+            title = '🏫 Academics';
+            body = `
+                <div class="form-group"><label>College / University</label><input type="text" id="editCollege" value="${esc(p.college || '')}" /></div>
+                <div class="form-group"><label>Degree Pursuing</label><input type="text" id="editDegree" value="${esc(p.degree_pursuing || '')}" /></div>
+                <div class="form-group"><label>Graduation Year</label><input type="text" id="editGradYear" value="${esc(p.graduation_year || '')}" /></div>
+                <div class="form-group"><label>CGPA / Percentage</label><input type="text" id="editCgpa" value="${esc(p.cgpa || '')}" /></div>
+                <button class="btn-primary" onclick="saveAcademics()">Save</button>`;
+            break;
+        case 'internships':
+            title = '🏢 Add Internship';
+            body = `
+                <div class="form-group"><label>Role / Title</label><input type="text" id="internTitle" /></div>
+                <div class="form-group"><label>Company</label><input type="text" id="internCompany" /></div>
+                <div class="form-group"><label>Period</label><input type="text" id="internPeriod" placeholder="e.g. May 2025 - Jul 2025" /></div>
+                <div class="form-group"><label>What you did</label><textarea id="internDesc" rows="2"></textarea></div>
+                <button class="btn-primary" onclick="addProfileEntry('internships', {title:gv('internTitle'),company:gv('internCompany'),period:gv('internPeriod'),description:gv('internDesc')})">Add</button>`;
+            break;
     }
     showProfileSheet(title, body);
 }
@@ -1332,7 +1404,7 @@ async function addProfileEntry(field, entry) {
     p[field] = arr;
     window._profileData = p;
     const data = {...p};
-    for (const f of ['work_history','education','projects','certifications','accomplishments','personal_info']) {
+    for (const f of ['work_history','education','projects','certifications','accomplishments','personal_info','internships']) {
         if (data[f] && typeof data[f] === 'object') data[f] = JSON.stringify(data[f]);
     }
     data.available_for_referral = document.getElementById('refToggle')?.checked || false;
@@ -1341,6 +1413,17 @@ async function addProfileEntry(field, entry) {
     closeProfileSheet();
     showToast('Added!');
     loadProfile();
+}
+
+async function saveAcademics() {
+    const p = window._profileData || {};
+    p.college = document.getElementById('editCollege')?.value.trim() || p.college;
+    p.degree_pursuing = document.getElementById('editDegree')?.value.trim() || p.degree_pursuing;
+    p.graduation_year = document.getElementById('editGradYear')?.value.trim() || p.graduation_year;
+    p.cgpa = document.getElementById('editCgpa')?.value.trim() || p.cgpa;
+    window._profileData = p;
+    await saveProfile();
+    closeProfileSheet();
 }
 
 async function toggleReferralAvailability() {

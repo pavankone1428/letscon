@@ -96,15 +96,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (regBtn) regBtn.addEventListener('click', async () => {
         const username = document.getElementById('regName').value.trim();
         const email = document.getElementById('regEmail').value.trim();
-        const company = document.getElementById('regCompany').value.trim();
-        const role = document.getElementById('regRole').value.trim();
         const password = document.getElementById('regPassword').value;
+        const accountType = document.querySelector('input[name="accountType"]:checked')?.value || 'professional';
+        const company = document.getElementById('regCompany')?.value.trim() || '';
+        const role = document.getElementById('regRole')?.value.trim() || '';
+        const college = document.getElementById('regCollege')?.value.trim() || '';
+        const degree_pursuing = document.getElementById('regDegree')?.value.trim() || '';
+        const graduation_year = document.getElementById('regGradYear')?.value.trim() || '';
         if (!username || !email || !password) { showMsg('Name, email and password required', 'error'); return; }
         if (password.length < 6) { showMsg('Password must be at least 6 characters', 'error'); return; }
         try {
             const res = await fetch('/api/register', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ username, email, password, company, role })
+                body: JSON.stringify({ username, email, password, company, role, account_type: accountType, college, degree_pursuing, graduation_year })
             });
             const data = await res.json();
             if (res.ok) { showMsg('Account created!', 'success'); setTimeout(() => location.reload(), 800); }
@@ -118,3 +122,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') document.getElementById('loginBtn').click();
     });
 });
+
+function selectAccountType(el) {
+    document.querySelectorAll('#registerFormSection .type-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    el.querySelector('input').checked = true;
+    const isStudent = el.dataset.value === 'student';
+    const profFields = document.getElementById('regProfessionalFields');
+    const stuFields = document.getElementById('regStudentFields');
+    if (profFields) profFields.style.display = isStudent ? 'none' : 'block';
+    if (stuFields) stuFields.style.display = isStudent ? 'block' : 'none';
+}

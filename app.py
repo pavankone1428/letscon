@@ -380,7 +380,10 @@ def init_db():
     for col, ctype in [('headline', 'TEXT'), ('tagline', 'TEXT'), ('location', 'TEXT'),
                         ('work_history', 'TEXT'), ('education', 'TEXT'), ('projects', 'TEXT'),
                         ('certifications', 'TEXT'), ('accomplishments', 'TEXT'),
-                        ('career_goals', 'TEXT'), ('personal_info', 'TEXT')]:
+                        ('career_goals', 'TEXT'), ('personal_info', 'TEXT'),
+                        ('account_type', 'TEXT'), ('college', 'TEXT'), ('degree_pursuing', 'TEXT'),
+                        ('graduation_year', 'TEXT'), ('cgpa', 'TEXT'), ('internships', 'TEXT'),
+                        ('profile_setup_done', 'BOOLEAN DEFAULT 0')]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ctype}")
         except Exception:
@@ -495,6 +498,10 @@ def register():
     password = data.get('password', '')
     company = data.get('company', '').strip()
     role = data.get('role', '').strip()
+    account_type = data.get('account_type', 'professional')
+    college = data.get('college', '').strip()
+    degree_pursuing = data.get('degree_pursuing', '').strip()
+    graduation_year = data.get('graduation_year', '').strip()
 
     if not email or not username or not password:
         return jsonify({'error': 'Email, name and password required'}), 400
@@ -504,14 +511,14 @@ def register():
     conn = get_db()
     try:
         hashed = generate_password_hash(password)
-        conn.execute('''INSERT INTO users (email, username, password, company, role)
-                        VALUES (?,?,?,?,?)''', (email, username, hashed, company, role))
+        conn.execute('''INSERT INTO users (email, username, password, company, role, account_type, college, degree_pursuing, graduation_year)
+                        VALUES (?,?,?,?,?,?,?,?,?)''', (email, username, hashed, company, role, account_type, college, degree_pursuing, graduation_year))
         conn.commit()
         user_id = get_last_id(conn, 'users')
         session['user_id'] = user_id
         session['username'] = username
         return jsonify({'message': 'Registration successful'})
-    except sqlite3.IntegrityError:
+    except Exception:
         return jsonify({'error': 'Email already registered'}), 400
     finally:
         conn.close()
@@ -575,7 +582,8 @@ def get_profile():
     user = conn.execute('''SELECT id, email, username, company, role, experience, bio, skills,
                            linkedin, github, available_for_referral, profile_photo, resume, is_private, created_at,
                            headline, tagline, location, work_history, education, projects,
-                           certifications, accomplishments, career_goals, personal_info
+                           certifications, accomplishments, career_goals, personal_info,
+                           account_type, college, degree_pursuing, graduation_year, cgpa, internships, profile_setup_done
                            FROM users WHERE id=?''', (session['user_id'],)).fetchone()
     u = dict(user)
     u['connections_count'] = conn.execute(
@@ -584,7 +592,7 @@ def get_profile():
     u['posts_count'] = conn.execute('SELECT COUNT(*) as c FROM posts WHERE user_id=?', (session['user_id'],)).fetchone()['c']
     conn.close()
     # Parse JSON fields
-    for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info']:
+    for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info', 'internships']:
         try:
             u[f] = json.loads(u[f]) if u[f] else None
         except:
@@ -599,13 +607,15 @@ def update_profile():
         data = request.json
         conn = get_db()
         # Serialize JSON fields
-        for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info']:
+        for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'personal_info', 'internships']:
             if f in data and isinstance(data[f], (list, dict)):
                 data[f] = json.dumps(data[f])
         conn.execute('''UPDATE users SET username=?, company=?, role=?, experience=?,
                         bio=?, skills=?, linkedin=?, github=?, available_for_referral=?, is_private=?,
                         headline=?, tagline=?, location=?, work_history=?, education=?, projects=?,
-                        certifications=?, accomplishments=?, career_goals=?, personal_info=?
+                        certifications=?, accomplishments=?, career_goals=?, personal_info=?,
+                        account_type=?, college=?, degree_pursuing=?, graduation_year=?, cgpa=?,
+                        internships=?, profile_setup_done=?
                         WHERE id=?''',
                      (data.get('username'), data.get('company'), data.get('role'),
                       data.get('experience', 0), data.get('bio'), data.get('skills'),
@@ -616,6 +626,9 @@ def update_profile():
                       data.get('work_history'), data.get('education'), data.get('projects'),
                       data.get('certifications'), data.get('accomplishments'),
                       data.get('career_goals'), data.get('personal_info'),
+                      data.get('account_type'), data.get('college'), data.get('degree_pursuing'),
+                      data.get('graduation_year'), data.get('cgpa'),
+                      data.get('internships'), 1 if data.get('profile_setup_done') else 0,
                       session['user_id']))
         conn.commit()
         conn.close()
