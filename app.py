@@ -21,6 +21,9 @@ USE_PG = bool(DATABASE_URL)
 if USE_PG:
     import psycopg2
     import psycopg2.extras
+    print(f"[DB] Using PostgreSQL: {DATABASE_URL[:30]}...")
+else:
+    print("[DB] Using SQLite (no DATABASE_URL found)")
 
 otp_store = {}
 
