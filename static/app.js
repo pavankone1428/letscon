@@ -120,7 +120,7 @@ function switchTab(btn, source) {
     if (tab === 'feed') loadFeed();
     if (tab === 'network') loadPeople();
     if (tab === 'referrals') loadReferralRequests();
-    if (tab === 'messages') { showConvoView(); loadConversations(); }
+    if (tab === 'messages') { showConvoView(); loadConversations(); loadMentionConnections(); }
     if (tab === 'insights') loadReviews();
     if (tab === 'notifications') loadNotifications();
     if (tab === 'profile') loadProfile();
@@ -2229,7 +2229,7 @@ async function loadMentionConnections() {
     } catch { mentionConnections = []; }
 }
 
-function handleMentionInput(input, dropdownId) {
+async function handleMentionInput(input, dropdownId) {
     const val = input.value || input.textContent || '';
     const cursorPos = input.selectionStart || val.length;
     const textBefore = val.substring(0, cursorPos);
@@ -2239,11 +2239,17 @@ function handleMentionInput(input, dropdownId) {
     if (match) {
         const query = match[1].toLowerCase();
         // Use group members if in group chat, otherwise connections
-        let pool = mentionConnections;
+        let pool;
         if (currentGroupId && groupMembersForMention.length > 0 && dropdownId === 'chatMentionDropdown') {
             pool = groupMembersForMention;
+        } else {
+            pool = mentionConnections;
         }
-        if (pool.length === 0) loadMentionConnections();
+        // Reload connections if empty
+        if (pool.length === 0) {
+            await loadMentionConnections();
+            pool = currentGroupId && groupMembersForMention.length > 0 && dropdownId === 'chatMentionDropdown' ? groupMembersForMention : mentionConnections;
+        }
         const filtered = pool.filter(c =>
             c.username.toLowerCase().includes(query)
         ).slice(0, 8);
