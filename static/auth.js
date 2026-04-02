@@ -73,10 +73,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ email, password })
             });
             const data = await res.json();
-            if (res.ok) { showMsg('Login successful!', 'success'); setTimeout(() => location.reload(), 800); }
+            if (res.ok) {
+                const remember = document.getElementById('rememberMe');
+                if (remember && remember.checked) {
+                    localStorage.setItem('letscon-remember', email);
+                } else {
+                    localStorage.removeItem('letscon-remember');
+                }
+                showMsg('Login successful!', 'success'); setTimeout(() => location.reload(), 800);
+            }
             else showMsg(data.error, 'error');
         } catch (err) { console.error('Login error:', err); showMsg('Connection error: ' + err.message, 'error'); }
     });
+
+    // Prefill remembered username
+    const saved = localStorage.getItem('letscon-remember');
+    const loginEmail = document.getElementById('loginEmail');
+    const rememberCb = document.getElementById('rememberMe');
+    if (saved && loginEmail) { loginEmail.value = saved; if (rememberCb) rememberCb.checked = true; }
 
     const regBtn = document.getElementById('registerBtn');
     if (regBtn) regBtn.addEventListener('click', async () => {
