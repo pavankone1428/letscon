@@ -556,6 +556,13 @@ async function viewUserProfile(userId) {
 
     const container = document.getElementById('profileContent');
     const avatarLetter = (u.username || 'U')[0].toUpperCase();
+    const isStudent = u.account_type === 'student';
+    const workHistory = u.work_history || [];
+    const education = u.education || [];
+    const projects = u.projects || [];
+    const certs = u.certifications || [];
+    const accomplishments = u.accomplishments || [];
+    const internships = u.internships || [];
 
     let html = `
         <div class="user-profile-page">
@@ -567,35 +574,84 @@ async function viewUserProfile(userId) {
             <div class="profile-card" style="border-top:none;border-radius:0 0 0.5rem 0.5rem;padding-top:4rem;">
                 <div style="text-align:center;">
                     <h2 style="font-size:1.4rem;margin-bottom:0.15rem;">${esc(u.username)}</h2>
-                    <div class="company-role" style="font-size:0.95rem;">${esc(u.company || '')} ${u.role ? '· ' + esc(u.role) : ''}</div>
-                    <div style="color:#999;font-size:0.85rem;margin-top:0.25rem;">${u.connections_count} connection${u.connections_count !== 1 ? 's' : ''}</div>
+                    ${u.headline ? `<div style="font-size:0.95rem;margin-bottom:0.15rem;">${esc(u.headline)}</div>` : ''}
+                    ${isStudent
+                        ? `<div class="company-role">🎓 ${esc(u.degree_pursuing || 'Student')} ${u.college ? 'at ' + esc(u.college) : ''}</div>`
+                        : `<div class="company-role">${esc(u.company || '')} ${u.role ? '· ' + esc(u.role) : ''}</div>`}
+                    ${u.location ? `<div style="color:#999;font-size:0.85rem;">📍 ${esc(u.location)}</div>` : ''}
+                    ${u.tagline ? `<div style="color:var(--accent);font-size:0.85rem;font-style:italic;margin-top:0.25rem;">"${esc(u.tagline)}"</div>` : ''}
+                    <div class="profile-stats" style="justify-content:center;margin-top:0.75rem;">
+                        <div class="pstat" style="cursor:pointer;" onclick="showUserConnections(${u.id})"><div class="num">${u.connections_count || 0}</div><div class="lbl">Connections</div></div>
+                        <div class="pstat" style="cursor:pointer;" onclick="showUserPosts(${u.id})"><div class="num">${u.posts_count || 0}</div><div class="lbl">Posts</div></div>
+                    </div>
                     ${u.is_restricted ? '<div style="color:#f59e0b;font-size:0.85rem;margin-top:0.5rem;">🔒 Private profile — connect to see full details</div>' : ''}
                 </div>
-
                 <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
                     ${u.is_connected ? `<button class="btn-primary btn-sm" onclick="openChat(${u.id}, '${esc(u.username)}')">💬 Message</button>` : ''}
                     ${u.connection_status === 'accepted' ? '' :
                       u.connection_status === 'pending' && u.is_sender ? `<button class="btn-outline btn-sm" disabled>⏳ Request Sent</button>` :
                       u.connection_status === 'pending' && !u.is_sender ? `<button class="btn-primary btn-sm btn-accent" onclick="acceptFromNotif(${u.id})">Accept Request</button>` :
                       `<button class="btn-primary btn-sm" onclick="sendRequest(${u.id}, this)">+ Connect</button>`}
-                </div>`;
+                </div>
+            </div>`;
 
     if (!u.is_restricted) {
         html += `
-                ${u.experience ? `<div class="profile-detail-row">📅 ${u.experience} years experience</div>` : ''}
-                ${u.bio ? `<div class="profile-detail-row" style="line-height:1.5;">${esc(u.bio)}</div>` : ''}
-                ${u.skills ? `<div class="profile-skills" style="justify-content:center;">${u.skills.split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div>` : ''}
-                <div class="profile-links" style="justify-content:center;">
-                    ${u.linkedin ? `<a href="${esc(u.linkedin)}" target="_blank">🔗 LinkedIn</a>` : ''}
-                    ${u.github ? `<a href="${esc(u.github)}" target="_blank">💻 GitHub</a>` : ''}
-                </div>
-                ${u.resume ? `<div style="text-align:center;margin-top:0.5rem;"><button class="btn-outline btn-sm" onclick="viewResume(${u.id})">📄 View Resume</button></div>` : ''}
-        `;
+        ${u.bio ? `<div class="profile-section"><div class="profile-section-header"><span>🧑 About</span></div><p style="line-height:1.5;color:var(--text-secondary);">${esc(u.bio)}</p></div>` : ''}
+        ${u.skills ? `<div class="profile-section"><div class="profile-section-header"><span>🛠️ Expertise</span></div><div class="profile-skills">${u.skills.split(',').map(s => `<span class="skill-tag">${s.trim()}</span>`).join('')}</div></div>` : ''}
+        ${workHistory.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>💼 Work Journey</span></div>${workHistory.map(w => `<div class="profile-entry"><div class="entry-title">${esc(w.title||'')} ${w.company?'at '+esc(w.company):''}</div><div class="entry-meta">${esc(w.period||'')}</div>${w.description?`<div class="entry-desc">${esc(w.description)}</div>`:''}</div>`).join('')}</div>` : ''}
+        ${internships.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>🏢 Internships</span></div>${internships.map(w => `<div class="profile-entry"><div class="entry-title">${esc(w.title||'')} at ${esc(w.company||'')}</div><div class="entry-meta">${esc(w.period||'')}</div>${w.description?`<div class="entry-desc">${esc(w.description)}</div>`:''}</div>`).join('')}</div>` : ''}
+        ${education.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>🎓 Learning Path</span></div>${education.map(e => `<div class="profile-entry"><div class="entry-title">${esc(e.degree||'')} ${e.field?'— '+esc(e.field):''}</div><div class="entry-meta">${esc(e.institution||'')} ${e.year?'· '+esc(e.year):''}</div></div>`).join('')}</div>` : ''}
+        ${projects.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>🚀 Projects</span></div>${projects.map(pr => `<div class="profile-entry"><div class="entry-title">${esc(pr.name||'')}</div>${pr.description?`<div class="entry-desc">${esc(pr.description)}</div>`:''}</div>`).join('')}</div>` : ''}
+        ${certs.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>📜 Credentials</span></div>${certs.map(c => `<div class="profile-entry"><div class="entry-title">${esc(c.name||'')}</div><div class="entry-meta">${esc(c.issuer||'')} ${c.year?'· '+esc(c.year):''}</div></div>`).join('')}</div>` : ''}
+        ${accomplishments.length > 0 ? `<div class="profile-section"><div class="profile-section-header"><span>🏆 Milestones</span></div>${accomplishments.map(a => `<div class="profile-entry"><div class="entry-title">${esc(a.title||'')}</div>${a.description?`<div class="entry-desc">${esc(a.description)}</div>`:''}</div>`).join('')}</div>` : ''}
+        ${u.career_goals ? `<div class="profile-section"><div class="profile-section-header"><span>🎯 Career Vision</span></div><p style="line-height:1.5;color:var(--text-secondary);">${esc(u.career_goals)}</p></div>` : ''}
+        <div class="profile-section"><div class="profile-section-header"><span>📄 Resume</span></div>
+            ${u.has_resume ? (u.resume ? `<button class="btn-outline btn-sm" onclick="viewResume(${u.id})">📄 View Resume</button>` :
+              u.resume_access === 'pending' ? `<button class="btn-outline btn-sm" disabled>⏳ Request Pending</button>` :
+              u.resume_access === 'approved' ? `<button class="btn-outline btn-sm" onclick="viewResume(${u.id})">📄 View Resume</button>` :
+              `<button class="btn-primary btn-sm" onclick="requestResume(${u.id}, this)">🔒 Request Resume Access</button>`) :
+              '<p style="color:#999;">No resume uploaded</p>'}
+        </div>
+        <div class="profile-links" style="padding:1rem;">
+            ${u.linkedin ? `<a href="${esc(u.linkedin)}" target="_blank">LinkedIn</a>` : ''}
+            ${u.github ? `<a href="${esc(u.github)}" target="_blank">GitHub</a>` : ''}
+        </div>`;
     }
 
-    html += `</div></div>`;
+    html += `</div>`;
     container.innerHTML = html;
 }
+
+async function requestResume(userId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="btn-spinner"></span> Requesting...'; }
+    await fetch(`/api/resume/request/${userId}`, { method:'POST' });
+    if (btn) { btn.innerHTML = '⏳ Request Sent'; }
+    showToast('Resume access requested');
+}
+
+async function showUserConnections(userId) {
+    const res = await fetch(`/api/users/${userId}/connections`);
+    const conns = await res.json();
+    let html = '<div style="padding:1rem;">';
+    if (conns.length === 0) { html += '<p style="color:#999;text-align:center;">No connections yet</p>'; }
+    else { html += conns.map(c => `<div class="person-card"><div class="person-avatar">${c.username[0].toUpperCase()}</div><div class="person-info"><div class="person-name">${esc(c.username)}</div><div class="person-detail">${esc(c.company||'')} ${c.role?'· '+esc(c.role):''}</div></div></div>`).join(''); }
+    html += '</div>';
+    showProfileSheet('👥 Connections', html);
+}
+
+async function showUserPosts(userId) {
+    const res = await fetch(`/api/users/${userId}/posts`);
+    const posts = await res.json();
+    let html = '<div style="padding:0.5rem;">';
+    if (posts.length === 0) { html += '<p style="color:#999;text-align:center;">No posts yet</p>'; }
+    else { html += posts.map(p => `<div class="post-card" style="margin-bottom:0.5rem;"><span class="post-type ${p.type}" style="float:right;">${p.type}</span><h3 style="font-size:0.95rem;">${esc(p.title)}</h3><div class="post-body" style="font-size:0.85rem;">${esc(p.content).substring(0,150)}${p.content.length>150?'...':''}</div></div>`).join(''); }
+    html += '</div>';
+    showProfileSheet('📝 Posts', html);
+}
+
+async function showMyConnections() { showUserConnections(window._profileData?.id); }
+async function showMyPosts() { showUserPosts(window._profileData?.id); }
 
 async function viewResume(userId) {
     const res = await fetch(`/api/users/${userId}`);
@@ -1085,8 +1141,8 @@ async function loadProfile() {
                 </div>
             </div>
             <div class="profile-stats">
-                <div class="pstat"><div class="num">${p.connections_count || 0}</div><div class="lbl">Connections</div></div>
-                <div class="pstat"><div class="num">${p.posts_count || 0}</div><div class="lbl">Posts</div></div>
+                <div class="pstat" style="cursor:pointer;" onclick="showMyConnections()"><div class="num">${p.connections_count || 0}</div><div class="lbl">Connections</div></div>
+                <div class="pstat" style="cursor:pointer;" onclick="showMyPosts()"><div class="num">${p.posts_count || 0}</div><div class="lbl">Posts</div></div>
                 <div class="pstat"><div class="num">${p.experience || 0}</div><div class="lbl">${isStudent ? 'Sem' : 'Years Exp'}</div></div>
             </div>
         </div>

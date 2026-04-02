@@ -303,6 +303,16 @@ def init_db():
         FOREIGN KEY (sender_id) REFERENCES users(id)
     )''')
 
+    run('''CREATE TABLE IF NOT EXISTS resume_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        requester_id INTEGER NOT NULL,
+        owner_id INTEGER NOT NULL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (requester_id) REFERENCES users(id),
+        FOREIGN KEY (owner_id) REFERENCES users(id)
+    )''')
+
     run('''CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reporter_id INTEGER NOT NULL,
@@ -661,25 +671,77 @@ def upload_resume():
     conn.close()
     return jsonify({'message': 'Resume uploaded'})
 
+@app.route('/api/resume/request/<int:owner_id>', methods=['POST'])
+def request_resume(owner_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    existing = conn.execute('SELECT id FROM resume_requests WHERE requester_id=? AND owner_id=?',
+                            (session['user_id'], owner_id)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({'message': 'Already requested'}), 200
+    conn.execute('INSERT INTO resume_requests (requester_id, owner_id) VALUES (?,?)',
+                 (session['user_id'], owner_id))
+    create_notification(owner_id, session['user_id'], 'resume_request',
+                       f'{session["username"]} requested access to your resume', conn)
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Request sent'})
+
+@app.route('/api/resume/respond/<int:request_id>', methods=['POST'])
+def respond_resume_request(request_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    action = data.get('action', 'approve')
+    conn = get_db()
+    req = conn.execute('SELECT * FROM resume_requests WHERE id=? AND owner_id=?',
+                       (request_id, session['user_id'])).fetchone()
+    if not req:
+        conn.close()
+        return jsonify({'error': 'Not found'}), 404
+    new_status = 'approved' if action == 'approve' else 'denied'
+    conn.execute('UPDATE resume_requests SET status=? WHERE id=?', (new_status, request_id))
+    if action == 'approve':
+        create_notification(req['requester_id'], session['user_id'], 'resume_approved',
+                           f'{session["username"]} approved your resume request', conn)
+    conn.commit()
+    conn.close()
+    return jsonify({'message': f'Request {new_status}'})
+
+@app.route('/api/resume/requests', methods=['GET'])
+def get_resume_requests():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    reqs = conn.execute('''SELECT rr.*, u.username FROM resume_requests rr
+                           JOIN users u ON rr.requester_id=u.id
+                           WHERE rr.owner_id=? ORDER BY rr.created_at DESC''',
+                        (session['user_id'],)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in reqs])
+
 @app.route('/api/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
     user = conn.execute('''SELECT id, username, company, role, experience, bio, skills,
-                           linkedin, github, available_for_referral, profile_photo, resume, is_private
+                           linkedin, github, available_for_referral, profile_photo, resume, is_private,
+                           headline, tagline, location, work_history, education, projects,
+                           certifications, accomplishments, career_goals, account_type, college,
+                           degree_pursuing, graduation_year, cgpa, internships
                            FROM users WHERE id=?''', (user_id,)).fetchone()
     if not user:
         conn.close()
         return jsonify({'error': 'User not found'}), 404
 
     u = dict(user)
-    # Check if connected
     is_connected = conn.execute(
         '''SELECT id FROM connections WHERE ((sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)) AND status='accepted' ''',
         (session['user_id'], user_id, user_id, session['user_id'])).fetchone()
     u['is_connected'] = bool(is_connected)
-    # Check pending status
     conn_row = conn.execute(
         '''SELECT status, sender_id FROM connections WHERE (sender_id=? AND receiver_id=?) OR (sender_id=? AND receiver_id=?)''',
         (session['user_id'], user_id, user_id, session['user_id'])).fetchone()
@@ -688,22 +750,58 @@ def get_user(user_id):
     u['connections_count'] = conn.execute(
         '''SELECT COUNT(*) as c FROM connections WHERE (sender_id=? OR receiver_id=?) AND status='accepted' ''',
         (user_id, user_id)).fetchone()['c']
+    u['posts_count'] = conn.execute('SELECT COUNT(*) as c FROM posts WHERE user_id=?', (user_id,)).fetchone()['c']
 
-    # Privacy: if private and not connected, hide sensitive fields
+    # Resume access check
+    resume_req = conn.execute('SELECT status FROM resume_requests WHERE requester_id=? AND owner_id=?',
+                              (session['user_id'], user_id)).fetchone()
+    u['resume_access'] = resume_req['status'] if resume_req else None
+    u['has_resume'] = bool(user['resume'])
+    # Don't send actual resume data unless approved
+    if not (resume_req and resume_req['status'] == 'approved'):
+        u['resume'] = None
+
     is_self = user_id == session['user_id']
     if user['is_private'] and not is_connected and not is_self:
-        u['bio'] = None
-        u['skills'] = None
-        u['linkedin'] = None
-        u['github'] = None
-        u['resume'] = None
-        u['experience'] = None
+        u['bio'] = None; u['skills'] = None; u['linkedin'] = None; u['github'] = None
+        u['resume'] = None; u['experience'] = None; u['work_history'] = None
+        u['education'] = None; u['projects'] = None; u['certifications'] = None
+        u['accomplishments'] = None; u['internships'] = None
         u['is_restricted'] = True
     else:
         u['is_restricted'] = False
+        for f in ['work_history', 'education', 'projects', 'certifications', 'accomplishments', 'internships']:
+            try:
+                u[f] = json.loads(u[f]) if u[f] else []
+            except:
+                u[f] = []
 
     conn.close()
     return jsonify(u)
+
+@app.route('/api/users/<int:user_id>/posts', methods=['GET'])
+def get_user_posts(user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    posts = conn.execute('''SELECT p.*, u.username, u.company, u.role
+                            FROM posts p JOIN users u ON p.user_id=u.id
+                            WHERE p.user_id=? ORDER BY p.created_at DESC''', (user_id,)).fetchall()
+    conn.close()
+    return jsonify([dict(p) for p in posts])
+
+@app.route('/api/users/<int:user_id>/connections', methods=['GET'])
+def get_user_connections(user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    conns = conn.execute('''SELECT u.id, u.username, u.company, u.role
+                            FROM connections c
+                            JOIN users u ON (CASE WHEN c.sender_id=? THEN c.receiver_id ELSE c.sender_id END)=u.id
+                            WHERE (c.sender_id=? OR c.receiver_id=?) AND c.status='accepted' ''',
+                         (user_id, user_id, user_id)).fetchall()
+    conn.close()
+    return jsonify([dict(c) for c in conns])
 
 # ─── CONNECTIONS ───
 
