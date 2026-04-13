@@ -1286,6 +1286,10 @@ async function loadProfile() {
                 <label class="toggle-switch"><input type="checkbox" id="privacyToggle" ${p.is_private ? 'checked' : ''} onchange="togglePrivacy()"><span class="toggle-slider"></span></label>
                 <div style="flex:1;min-width:0;"><span style="font-weight:600;">Private Profile</span><div style="font-size:0.8rem;color:#999;">Only connections see full details</div></div>
             </div>
+            <div class="referral-toggle" style="margin:0.5rem 0 0;">
+                <label class="toggle-switch"><input type="checkbox" id="botBadgeToggle" ${localStorage.getItem('letscon-bot-badge') !== 'hidden' ? 'checked' : ''} onchange="toggleBotBadge()"><span class="toggle-slider"></span></label>
+                <div style="flex:1;min-width:0;"><span style="font-weight:600;">🤖 AI Assistant Badge</span><div style="font-size:0.8rem;color:#999;">Show floating help button</div></div>
+            </div>
         </div>
 
         <!-- Support -->
@@ -2225,6 +2229,26 @@ function recordVideoClip() {
 
 // ─── SUPPORT CHATBOT ───
 let supportMessages = [];
+
+function initBotBadge() {
+    const badge = document.getElementById('aiBotBadge');
+    if (badge && localStorage.getItem('letscon-bot-badge') === 'hidden') {
+        badge.classList.add('hidden');
+    }
+}
+initBotBadge();
+
+function toggleBotBadge() {
+    const checked = document.getElementById('botBadgeToggle')?.checked;
+    const badge = document.getElementById('aiBotBadge');
+    if (checked) {
+        localStorage.removeItem('letscon-bot-badge');
+        if (badge) badge.classList.remove('hidden');
+    } else {
+        localStorage.setItem('letscon-bot-badge', 'hidden');
+        if (badge) badge.classList.add('hidden');
+    }
+}
 
 function openSupportChat() {
     supportMessages = [

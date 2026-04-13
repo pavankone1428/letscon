@@ -582,6 +582,7 @@
                 <a href="#" onclick="goTab('messages')">💬 Messages</a>
                 <a href="#" onclick="goTab('notifications')">🔔 Notifications</a>
                 <a href="#" onclick="goTab('insights')">🏢 Company Insights</a>
+                <a href="#" onclick="closeSidebarFn(); openSupportChat()">🤖 Help & Support</a>
                 <hr>
                 <div class="switch-accounts-section">
                     <div class="switch-label">🎨 Theme</div>
@@ -602,6 +603,13 @@
                 <a href="#" onclick="confirmLogout()">🚪 Logout</a>
             </div>
         </aside>
+        {% endif %}
+
+        <!-- Floating AI Bot Badge -->
+        {% if logged_in %}
+        <div id="aiBotBadge" class="ai-bot-badge" onclick="openSupportChat()">
+            🤖
+        </div>
         {% endif %}
 
         <!-- Bottom Nav (mobile) -->
