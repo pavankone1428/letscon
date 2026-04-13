@@ -2293,78 +2293,98 @@ function sendSupportMsg() {
 
 function getBotReply(q) {
     // Profile & Account
-    if (q.match(/profile|edit profile|update profile|headline|bio/))
+    if (q.match(/profile|edit profile|update profile|headline|bio|about me/))
         return "To edit your profile:\n1. Go to Profile tab\n2. Click ✏️ on any section\n3. Fill in details and Save\n\nYour profile has sections for About, Expertise, Work Journey, Education, Projects, Credentials, and more!";
     if (q.match(/account type|student|professional|change account/))
         return "Your account type (Student/Professional) is set during signup. Students get academic sections like College, CGPA, and Internships. Professionals get Work Journey. Contact support if you need to change it.";
-    if (q.match(/password|change password|forgot password/))
+    if (q.match(/password|change password|forgot password|reset password/))
         return "Password reset isn't available yet. For now, contact our support team at support@letscon.com to reset your password.";
-    if (q.match(/delete account|deactivate/))
+    if (q.match(/delete account|deactivate|remove account/))
         return "Account deletion is handled by our support team. Please email support@letscon.com with your registered email to request account deletion.";
-    if (q.match(/profile completion|profile strength|percentage/))
+    if (q.match(/profile completion|profile strength|percentage|complete profile/))
         return "Your Profile Strength shows how complete your profile is. Fill in all sections (About, Skills, Work/Education, Projects, etc.) to reach 100%. A complete profile helps you get more connections and referrals!";
+    if (q.match(/sign up|signup|register|create account|new account/))
+        return "To create an account:\n1. Click 'Sign Up' on the welcome page\n2. Choose Student or Professional\n3. Fill in your details\n4. Click 'Create Account'\n\nThen complete your profile to get started!";
+    if (q.match(/login|log in|sign in|can't login|unable to login/))
+        return "To log in:\n1. Click 'Log In' on the welcome page\n2. Enter your email or username\n3. Enter your password\n4. Click 'LOG IN'\n\nTick 'Remember me' to save your username for next time.";
 
-    // Connections
-    if (q.match(/connect|connection|add friend|network/))
-        return "To connect with someone:\n1. Go to Network tab → Discover People\n2. Click 'Connect' on their profile\n3. Wait for them to accept\n\nYou can also search for people using the 🔍 icon.";
-    if (q.match(/pending|request sent|accept/))
+    // Connections & Friend Requests
+    if (q.match(/connect|connection|add friend|friend request|send request|network|find people|discover|search people|how to add/))
+        return "To send a connection request:\n1. Use the 🔍 Search icon to find someone by name\n2. Or go to Network tab → Discover People\n3. Click 'Connect' on their profile\n4. Wait for them to accept!\n\nYou can also view someone's profile and click '+ Connect' there.";
+    if (q.match(/pending|request sent|accept|decline|incoming request/))
         return "Check pending requests in Network tab → Pending Requests. You can accept or decline incoming requests there. You'll also get notifications for new requests.";
+    if (q.match(/unfriend|remove connection|disconnect/))
+        return "Currently you can't remove connections directly. This feature is coming soon. For now, you can block/report problematic users.";
+    if (q.match(/search|find someone|look for|find user|find friend/))
+        return "To find someone:\n1. Tap the 🔍 Search icon in the header\n2. Type their name, company, or skills\n3. Results show matching people and posts\n4. Click on a person to view their profile and connect!";
 
     // Messages & Groups
-    if (q.match(/message|chat|dm|direct message/))
-        return "To message someone:\n1. Connect with them first\n2. Go to Messages tab\n3. Click on their conversation\n\nYou can also click 'Message' on their profile or connection card.";
-    if (q.match(/group|create group|group chat/))
-        return "To create a group:\n1. Go to Messages → Groups tab\n2. Click '+ New Group'\n3. Name it and add members from your connections\n\nGroups support up to 150 members. Admins can add/remove members.";
-    if (q.match(/mention|@|tag someone/))
-        return "Type @ followed by a name to mention someone. In group chats, it shows group members. In posts/comments, it shows your connections. The mentioned person gets a notification.";
-    if (q.match(/emoji|sticker/))
+    if (q.match(/message|chat|dm|direct message|send message|how to chat|talk to/))
+        return "To message someone:\n1. Connect with them first\n2. Go to Messages tab → Chats\n3. Click on their conversation\n\nYou can also click 'Message' on their profile or in your connections list.";
+    if (q.match(/group|create group|group chat|make group|new group/))
+        return "To create a group:\n1. Go to Messages → Groups tab\n2. Click '+ New Group'\n3. Name it and add members from your connections\n\nGroups support up to 150 members. Click the group name to manage members, add/remove people, or exit.";
+    if (q.match(/mention|@|tag someone|tag people/))
+        return "Type @ followed by a name to mention someone. In group chats, it shows group members. In posts/comments, it shows your connections. The mentioned person gets a notification!";
+    if (q.match(/emoji|sticker|smiley/))
         return "Click the 😊 icon in the chat input to open the emoji picker. We have 700+ emojis across 12 categories including smileys, people, animals, food, flags, and more!";
-    if (q.match(/file|attach|send file|photo|image/))
-        return "Click the + icon in chat to attach files (up to 5MB). You can send images, documents, and other files.";
-    if (q.match(/schedule|scheduled message/))
-        return "Click + in chat → 'Schedule message'. Pick a date and time, and your message will be sent automatically at that time.";
+    if (q.match(/file|attach|send file|photo|image|document|pdf/))
+        return "Click the + icon in chat → 'Attach file'. You can send images, documents, PDFs and other files up to 5MB.";
+    if (q.match(/schedule|scheduled message|send later|timer/))
+        return "Click + in chat → 'Schedule message'. Pick a date and time, type your message, and it will be sent automatically at that time.";
+    if (q.match(/call|video call|voice call|phone/))
+        return "Voice and video calls are coming soon! For now, you can share your phone number or meeting link in chat.";
 
     // Posts & Stories
-    if (q.match(/post|create post|new post/))
-        return "To create a post:\n1. Go to Feed tab\n2. Click '+ New Post'\n3. Choose type (Problem/Solution/Discussion/Achievement)\n4. Write your content and post!\n\nUse @mentions to tag people.";
-    if (q.match(/story|stories|create story/))
-        return "Stories appear at the top of the Feed. Click 'Your Story' to create one. You can add text, choose a background color, or attach a photo/video. Stories expire after 24 hours.";
-    if (q.match(/delete post|remove post/))
-        return "To delete your post, click the ⋯ menu on your post and select '🗑️ Delete'. You can only delete your own posts.";
-    if (q.match(/comment|reply/))
-        return "Click the 💬 button on any post to open comments. You can like/dislike comments, reply to specific comments, and delete your own comments.";
+    if (q.match(/post|create post|new post|share post|write post|how to post/))
+        return "To create a post:\n1. Go to Feed tab\n2. Click '+ New Post'\n3. Choose type (Problem/Solution/Discussion/Achievement)\n4. Write your content and post!\n\nUse @mentions to tag people. Others can like, dislike, and comment.";
+    if (q.match(/story|stories|create story|add story/))
+        return "Stories appear at the top of the Feed:\n1. Click 'Your Story' or the + icon\n2. Write text and/or add a photo/video\n3. Choose a background color\n4. Post!\n\nStories expire after 24 hours. Others can react and reply to your stories.";
+    if (q.match(/delete post|remove post|delete story/))
+        return "To delete your post: click the ⋯ menu on your post → '🗑️ Delete'\nTo delete your story: open it → click ⋯ → 'Delete Story'\n\nYou can only delete your own content.";
+    if (q.match(/comment|reply to post|add comment/))
+        return "Click the 💬 button on any post to open comments. You can:\n• Like/dislike comments\n• Reply to specific comments (threaded)\n• Delete your own comments\n• Use @mentions in comments";
+    if (q.match(/like|dislike|react|upvote|downvote/))
+        return "On posts: click 👍 Like (turns blue) or 👎 Dislike (turns red)\nOn stories: use the emoji bar at the bottom\nOn comments: use the 👍/👎 buttons\n\nLong-press the Like button on posts for emoji reactions!";
 
     // Privacy & Security
-    if (q.match(/privacy|private|who can see/))
-        return "Toggle 'Private Profile' in your Profile → Settings. When private, only your connections can see your full profile, skills, resume, and other details.";
-    if (q.match(/resume|cv|download resume/))
-        return "Resume access is protected. Others must request access to view your resume. You'll get a notification and can approve or deny the request.";
+    if (q.match(/privacy|private|who can see|hide profile/))
+        return "Toggle 'Private Profile' in Profile → Settings. When private, only your connections can see your full profile, skills, resume, and other details. Others see limited info.";
+    if (q.match(/resume|cv|download resume|view resume/))
+        return "Resume access is protected:\n• Upload yours in Profile → Resume section\n• Others must click 'Request Resume Access' on your profile\n• You get a notification and can approve or deny\n• Only approved users can view your resume";
     if (q.match(/block|blocked/))
-        return "Blocking isn't available yet, but you can report users. Go to their profile or chat and click the ⚠️ Report button.";
+        return "Blocking isn't available yet, but you can report users. Go to their profile or chat and click the ⚠️ Report button. Our team reviews all reports.";
 
     // Reporting
-    if (q.match(/report|spam|fake|fraud|scam|harassment|abuse|illegal/))
-        return "To report an issue:\n• Report a post: Click ⋯ → Report on any post\n• Report a user: Click ⚠️ in their chat header\n• Report a group: Open group info → Report Group\n\nOur team reviews all reports within 24-48 hours. For urgent issues, email support@letscon.com";
-    if (q.match(/ban|banned|suspended/))
-        return "If your account was suspended, it may be due to a policy violation. Contact support@letscon.com with your email to appeal.";
+    if (q.match(/report|spam|fake|fraud|scam|harassment|abuse|illegal|inappropriate/))
+        return "To report an issue:\n• Report a post: Click ⋯ → Report\n• Report a user: Click ⚠️ in their chat header\n• Report a group: Open group info → Report Group\n\nChoose a reason (spam, harassment, fraud, etc.) and add details. Our team reviews reports within 24-48 hours.\n\nFor urgent issues, email support@letscon.com";
+    if (q.match(/ban|banned|suspended|restricted/))
+        return "If your account was suspended, it may be due to a policy violation. Contact support@letscon.com with your registered email to appeal.";
 
-    // Referrals
-    if (q.match(/referral|refer/))
-        return "Go to Referrals tab to browse or create referral requests. Toggle 'Available for referrals' in your profile to let others know you can refer them.";
+    // Referrals & Insights
+    if (q.match(/referral|refer|job referral/))
+        return "Go to Referrals tab:\n• Browse Requests: See who needs referrals\n• My Requests: Create your own referral request\n• Toggle 'Available for referrals' in your profile\n\nConnect with people who can refer you to their companies!";
+    if (q.match(/company|review|insight|salary|work life/))
+        return "Go to Insights tab to read anonymous company reviews. You can also add your own review with salary range, work-life balance rating, and more.";
 
-    // Theme
-    if (q.match(/theme|dark mode|color|appearance/))
-        return "Change your theme in the sidebar menu (click your avatar) → 🎨 Theme. We have 5 themes: Light, Dark, Midnight, Forest, and Sunset.";
+    // Theme & Settings
+    if (q.match(/theme|dark mode|color|appearance|light mode|night mode/))
+        return "Change your theme:\n1. Open sidebar (tap your avatar)\n2. Find 🎨 Theme section\n3. Choose from 5 themes: Light, Dark, Midnight, Forest, Sunset\n\nYour choice is saved automatically!";
+    if (q.match(/notification|alert|bell/))
+        return "Click the 🔔 bell icon to see all notifications. You get notified for:\n• Connection requests\n• Messages\n• Post likes/comments\n• Story reactions/replies\n• @mentions\n• Resume requests";
+    if (q.match(/switch account|change account|multiple account/))
+        return "Open the sidebar (tap your avatar) → scroll to 'Switch Account'. Click any account to switch instantly without logging out.";
 
     // General
-    if (q.match(/how to use|help|guide|tutorial|getting started/))
-        return "Welcome to LetsCon! Here's a quick guide:\n\n🏠 Feed — Browse posts, stories\n👥 Network — Find & connect with people\n🔗 Referrals — Request/offer referrals\n💬 Messages — Chat & group messaging\n👤 Profile — Build your professional profile\n\nStart by completing your profile and connecting with people!";
-    if (q.match(/thank|thanks|ok|okay|got it/))
+    if (q.match(/how to use|help|guide|tutorial|getting started|what can i do|features/))
+        return "Welcome to LetsCon! Here's a quick guide:\n\n🏠 Feed — Browse posts, stories, react & comment\n👥 Network — Find & connect with people\n🔗 Referrals — Request/offer job referrals\n💬 Messages — Chat, groups, file sharing\n👤 Profile — Build your professional profile\n🏢 Insights — Anonymous company reviews\n\nStart by completing your profile and connecting with people!";
+    if (q.match(/thank|thanks|ok|okay|got it|cool|great|awesome|perfect/))
         return "You're welcome! 😊 Is there anything else I can help with?";
-    if (q.match(/hi|hello|hey/))
+    if (q.match(/hi|hello|hey|sup|what's up/))
         return "Hey! 👋 How can I help you today? Ask me about any app feature, account issues, or reporting problems.";
-    if (q.match(/bye|goodbye/))
+    if (q.match(/bye|goodbye|see you|later/))
         return "Goodbye! Feel free to come back anytime you need help. 👋";
+    if (q.match(/who made|who built|developer|creator/))
+        return "LetsCon was built as a career networking & referral platform. For feedback or suggestions, reach out at support@letscon.com!";
 
     // Fallback
     return "I'm not sure about that one. Here are some things I can help with:\n• Profile & account setup\n• Connections & networking\n• Messages, groups & mentions\n• Posts, stories & comments\n• Privacy & security\n• Reporting issues\n\nFor complex issues, please contact our support team at support@letscon.com 📧";
