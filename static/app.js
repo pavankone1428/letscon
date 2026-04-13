@@ -1287,6 +1287,13 @@ async function loadProfile() {
                 <div style="flex:1;min-width:0;"><span style="font-weight:600;">Private Profile</span><div style="font-size:0.8rem;color:#999;">Only connections see full details</div></div>
             </div>
         </div>
+
+        <!-- Support -->
+        <div class="profile-section">
+            <div class="profile-section-header"><span>🤖 Help & Support</span></div>
+            <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem;">Got questions? Our bot can help with app features, account issues, reporting, and more.</p>
+            <button class="btn-primary btn-sm" onclick="openSupportChat()" style="width:100%;">💬 Chat with Support Bot</button>
+        </div>
     `;
     window._profileData = p;
 }
@@ -2214,6 +2221,129 @@ function applyDeliveryOpts() {
 function recordVideoClip() {
     closeChatPlusMenu();
     showToast('🎥 Video recording coming soon!');
+}
+
+// ─── SUPPORT CHATBOT ───
+let supportMessages = [];
+
+function openSupportChat() {
+    supportMessages = [
+        { from: 'bot', text: "Hi there! 👋 I'm LetsCon's support bot. How can I help you today?" },
+        { from: 'bot', text: "You can ask me about:\n• Account & profile\n• Connections & networking\n• Messages & groups\n• Posts & stories\n• Privacy & security\n• Reporting issues\n• App features\n\nOr type your question!" }
+    ];
+    renderSupportChat();
+}
+
+function renderSupportChat() {
+    const msgs = supportMessages.map(m => `
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;${m.from === 'user' ? 'flex-direction:row-reverse;' : ''}">
+            <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.8rem;${m.from === 'bot' ? 'background:linear-gradient(135deg,#38bdf8,#8b5cf6);color:white;' : 'background:var(--primary);color:white;'}">${m.from === 'bot' ? '🤖' : 'U'}</div>
+            <div style="max-width:80%;padding:0.6rem 0.85rem;border-radius:1rem;font-size:0.9rem;line-height:1.4;white-space:pre-line;${m.from === 'bot' ? 'background:var(--bg);' : 'background:var(--accent);color:white;'}">${esc(m.text)}</div>
+        </div>
+    `).join('');
+
+    const html = `
+        <div id="supportMsgs" style="flex:1;overflow-y:auto;padding:0.5rem;min-height:250px;">${msgs}</div>
+        <div style="display:flex;gap:0.5rem;padding:0.5rem;border-top:1px solid var(--border);">
+            <input type="text" id="supportInput" placeholder="Type your question..." style="flex:1;padding:0.6rem 0.85rem;border:2px solid var(--border);border-radius:2rem;font-size:0.9rem;outline:none;" onkeypress="if(event.key==='Enter')sendSupportMsg()" />
+            <button onclick="sendSupportMsg()" class="btn-primary btn-sm">Send</button>
+        </div>
+    `;
+    showProfileSheet('🤖 Help & Support', html);
+    setTimeout(() => { const el = document.getElementById('supportMsgs'); if (el) el.scrollTop = el.scrollHeight; }, 100);
+}
+
+function sendSupportMsg() {
+    const input = document.getElementById('supportInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    supportMessages.push({ from: 'user', text: msg });
+    input.value = '';
+    const reply = getBotReply(msg.toLowerCase());
+    setTimeout(() => {
+        supportMessages.push({ from: 'bot', text: reply });
+        renderSupportChat();
+    }, 500);
+    renderSupportChat();
+}
+
+function getBotReply(q) {
+    // Profile & Account
+    if (q.match(/profile|edit profile|update profile|headline|bio/))
+        return "To edit your profile:\n1. Go to Profile tab\n2. Click ✏️ on any section\n3. Fill in details and Save\n\nYour profile has sections for About, Expertise, Work Journey, Education, Projects, Credentials, and more!";
+    if (q.match(/account type|student|professional|change account/))
+        return "Your account type (Student/Professional) is set during signup. Students get academic sections like College, CGPA, and Internships. Professionals get Work Journey. Contact support if you need to change it.";
+    if (q.match(/password|change password|forgot password/))
+        return "Password reset isn't available yet. For now, contact our support team at support@letscon.com to reset your password.";
+    if (q.match(/delete account|deactivate/))
+        return "Account deletion is handled by our support team. Please email support@letscon.com with your registered email to request account deletion.";
+    if (q.match(/profile completion|profile strength|percentage/))
+        return "Your Profile Strength shows how complete your profile is. Fill in all sections (About, Skills, Work/Education, Projects, etc.) to reach 100%. A complete profile helps you get more connections and referrals!";
+
+    // Connections
+    if (q.match(/connect|connection|add friend|network/))
+        return "To connect with someone:\n1. Go to Network tab → Discover People\n2. Click 'Connect' on their profile\n3. Wait for them to accept\n\nYou can also search for people using the 🔍 icon.";
+    if (q.match(/pending|request sent|accept/))
+        return "Check pending requests in Network tab → Pending Requests. You can accept or decline incoming requests there. You'll also get notifications for new requests.";
+
+    // Messages & Groups
+    if (q.match(/message|chat|dm|direct message/))
+        return "To message someone:\n1. Connect with them first\n2. Go to Messages tab\n3. Click on their conversation\n\nYou can also click 'Message' on their profile or connection card.";
+    if (q.match(/group|create group|group chat/))
+        return "To create a group:\n1. Go to Messages → Groups tab\n2. Click '+ New Group'\n3. Name it and add members from your connections\n\nGroups support up to 150 members. Admins can add/remove members.";
+    if (q.match(/mention|@|tag someone/))
+        return "Type @ followed by a name to mention someone. In group chats, it shows group members. In posts/comments, it shows your connections. The mentioned person gets a notification.";
+    if (q.match(/emoji|sticker/))
+        return "Click the 😊 icon in the chat input to open the emoji picker. We have 700+ emojis across 12 categories including smileys, people, animals, food, flags, and more!";
+    if (q.match(/file|attach|send file|photo|image/))
+        return "Click the + icon in chat to attach files (up to 5MB). You can send images, documents, and other files.";
+    if (q.match(/schedule|scheduled message/))
+        return "Click + in chat → 'Schedule message'. Pick a date and time, and your message will be sent automatically at that time.";
+
+    // Posts & Stories
+    if (q.match(/post|create post|new post/))
+        return "To create a post:\n1. Go to Feed tab\n2. Click '+ New Post'\n3. Choose type (Problem/Solution/Discussion/Achievement)\n4. Write your content and post!\n\nUse @mentions to tag people.";
+    if (q.match(/story|stories|create story/))
+        return "Stories appear at the top of the Feed. Click 'Your Story' to create one. You can add text, choose a background color, or attach a photo/video. Stories expire after 24 hours.";
+    if (q.match(/delete post|remove post/))
+        return "To delete your post, click the ⋯ menu on your post and select '🗑️ Delete'. You can only delete your own posts.";
+    if (q.match(/comment|reply/))
+        return "Click the 💬 button on any post to open comments. You can like/dislike comments, reply to specific comments, and delete your own comments.";
+
+    // Privacy & Security
+    if (q.match(/privacy|private|who can see/))
+        return "Toggle 'Private Profile' in your Profile → Settings. When private, only your connections can see your full profile, skills, resume, and other details.";
+    if (q.match(/resume|cv|download resume/))
+        return "Resume access is protected. Others must request access to view your resume. You'll get a notification and can approve or deny the request.";
+    if (q.match(/block|blocked/))
+        return "Blocking isn't available yet, but you can report users. Go to their profile or chat and click the ⚠️ Report button.";
+
+    // Reporting
+    if (q.match(/report|spam|fake|fraud|scam|harassment|abuse|illegal/))
+        return "To report an issue:\n• Report a post: Click ⋯ → Report on any post\n• Report a user: Click ⚠️ in their chat header\n• Report a group: Open group info → Report Group\n\nOur team reviews all reports within 24-48 hours. For urgent issues, email support@letscon.com";
+    if (q.match(/ban|banned|suspended/))
+        return "If your account was suspended, it may be due to a policy violation. Contact support@letscon.com with your email to appeal.";
+
+    // Referrals
+    if (q.match(/referral|refer/))
+        return "Go to Referrals tab to browse or create referral requests. Toggle 'Available for referrals' in your profile to let others know you can refer them.";
+
+    // Theme
+    if (q.match(/theme|dark mode|color|appearance/))
+        return "Change your theme in the sidebar menu (click your avatar) → 🎨 Theme. We have 5 themes: Light, Dark, Midnight, Forest, and Sunset.";
+
+    // General
+    if (q.match(/how to use|help|guide|tutorial|getting started/))
+        return "Welcome to LetsCon! Here's a quick guide:\n\n🏠 Feed — Browse posts, stories\n👥 Network — Find & connect with people\n🔗 Referrals — Request/offer referrals\n💬 Messages — Chat & group messaging\n👤 Profile — Build your professional profile\n\nStart by completing your profile and connecting with people!";
+    if (q.match(/thank|thanks|ok|okay|got it/))
+        return "You're welcome! 😊 Is there anything else I can help with?";
+    if (q.match(/hi|hello|hey/))
+        return "Hey! 👋 How can I help you today? Ask me about any app feature, account issues, or reporting problems.";
+    if (q.match(/bye|goodbye/))
+        return "Goodbye! Feel free to come back anytime you need help. 👋";
+
+    // Fallback
+    return "I'm not sure about that one. Here are some things I can help with:\n• Profile & account setup\n• Connections & networking\n• Messages, groups & mentions\n• Posts, stories & comments\n• Privacy & security\n• Reporting issues\n\nFor complex issues, please contact our support team at support@letscon.com 📧";
 }
 
 // ─── @MENTIONS ───
