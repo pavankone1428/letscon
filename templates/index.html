@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LetsCon</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='animations.css') }}">
 </head>
 <body>
     <!-- Splash Screen -->
@@ -130,6 +131,7 @@
                 <button class="nav-item" data-tab="referrals">🔗 Referrals</button>
                 <button class="nav-item" data-tab="messages">💬 Messages</button>
                 <button class="nav-item" data-tab="insights">🏢 Insights</button>
+                <button class="nav-item" data-tab="games">🎮 Games</button>
                 <button class="nav-item" data-tab="profile">👤 Profile</button>
             </nav>
             {% endif %}
@@ -327,8 +329,142 @@
                 <div id="notifList"></div>
             </div>
 
+            <!-- Mini Games Tab -->
+            <div id="gamesTab" class="tab-content">
+                <div class="games-header">
+                    <h2>🎮 Mini Games Arena</h2>
+                    <div class="streak-badge animate-pulse">🔥 {dailyStreak} Day Streak!</div>
+                </div>
+                
+                <div class="games-grid">
+                    <div class="game-card" onclick="launchGame('sudoku')">
+                        <div class="game-icon">🎯</div>
+                        <h3>Sudoku</h3>
+                        <p>Classic number puzzle</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('memory')">
+                        <div class="game-icon">🃏</div>
+                        <h3>Memory Match</h3>
+                        <p>Find matching pairs</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('2048')">
+                        <div class="game-icon">🎲</div>
+                        <h3>2048</h3>
+                        <p>Slide & combine tiles</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('word_hunt')">
+                        <div class="game-icon">📝</div>
+                        <h3>Word Hunt</h3>
+                        <p>Find hidden words</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('math_blitz')">
+                        <div class="game-icon">➕</div>
+                        <h3>Math Blitz</h3>
+                        <p>Speed calculation</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('color_match')">
+                        <div class="game-icon">🎨</div>
+                        <h3>Color Match</h3>
+                        <p>Match the colors fast</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('reaction')">
+                        <div class="game-icon">⚡</div>
+                        <h3>Reaction Time</h3>
+                        <p>Test your reflexes</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('simon')">
+                        <div class="game-icon">🔵</div>
+                        <h3>Simon Says</h3>
+                        <p>Remember the pattern</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('typing')">
+                        <div class="game-icon">⌨️</div>
+                        <h3>Type Racer</h3>
+                        <p>Speed typing challenge</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="game-card" onclick="launchGame('quiz')">
+                        <div class="game-icon">🧠</div>
+                        <h3>Brain Quiz</h3>
+                        <p>Test your knowledge</p>
+                        <div class="game-stats">
+                            <span>⏱️ Best: --</span>
+                            <span>⭐ High: --</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="leaderboard-tabs">
+                    <button class="lb-tab active" onclick="switchLeaderboard('world')">🌍 World</button>
+                    <button class="lb-tab" onclick="switchLeaderboard('country')">🗺️ Country</button>
+                    <button class="lb-tab" onclick="switchLeaderboard('region')">📍 Region</button>
+                </div>
+                
+                <div id="leaderboardContent" class="leaderboard-content"></div>
+            </div>
+
             <!-- Profile Tab -->
             <div id="profileTab" class="tab-content">
+                <!-- Level Card -->
+                <div class="level-card">
+                    <div class="level-header">
+                        <div>
+                            <div class="level-number">Level 1</div>
+                            <div style="font-size:0.85rem;opacity:0.9;margin-top:0.2rem;">Keep exploring to level up!</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="level-xp">0 / 100 XP</div>
+                        </div>
+                    </div>
+                    <div class="level-progress-bar">
+                        <div class="level-progress-fill" style="width:0%"></div>
+                    </div>
+                </div>
+                
                 <div id="profileContent"></div>
             </div>
 
@@ -696,6 +832,37 @@
     </div>
 
     <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='gamification.js') }}"></script>
+    <script src="{{ url_for('static', filename='minigames.js') }}"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
+    
+    <script>
+    // Add XP for various actions
+    function trackAction(action) {
+        switch(action) {
+            case 'post_created':
+                gamification.addXP(10, 'Created a post');
+                gamification.unlockAchievement('FIRST_POST');
+                break;
+            case 'connection_made':
+                gamification.addXP(15, 'New connection');
+                gamification.unlockAchievement('FIRST_CONNECTION');
+                break;
+            case 'comment_added':
+                gamification.addXP(5, 'Added comment');
+                break;
+            case 'profile_completed':
+                gamification.addXP(25, 'Completed profile');
+                break;
+            case 'story_posted':
+                gamification.addXP(8, 'Posted story');
+                break;
+            case 'referral_helped':
+                gamification.addXP(20, 'Helped with referral');
+                break;
+        }
+    }
+    window.trackAction = trackAction;
+    </script>
 </body>
 </html>

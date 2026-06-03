@@ -9,9 +9,9 @@ import os
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
-app.secret_key = 'refnet-dev-secret-key-2024'
+app.secret_key = os.environ.get('SECRET_KEY', 'refnet-dev-secret-key-2024-CHANGE-IN-PRODUCTION')
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
@@ -353,6 +353,27 @@ def init_db():
         anonymous BOOLEAN DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
+    )''')
+
+    run('''CREATE TABLE IF NOT EXISTS game_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        game TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        time_taken INTEGER NOT NULL,
+        location_data TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )''')
+
+    run('''CREATE TABLE IF NOT EXISTS game_streaks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        current_streak INTEGER DEFAULT 1,
+        longest_streak INTEGER DEFAULT 1,
+        last_played_date TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE(user_id)
     )''')
 
     conn.commit()
@@ -1793,6 +1814,68 @@ def send_message_enhanced():
         create_notification(data['receiver_id'], session['user_id'], 'message',
                            f'New message from {session["username"]}')
     return jsonify({'message': 'Sent'}), 201
+
+# ─── MINI GAMES SYSTEM ───
+
+@app.route('/api/games/scores', methods=['POST'])
+def save_game_score():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    game = data.get('game')
+    score = data.get('score')
+    time_taken = data.get('time')
+    
+    conn = get_db()
+    conn.execute('''INSERT INTO game_scores (user_id, game, score, time_taken, location_data)
+                    VALUES (?,?,?,?,?)''',
+                 (session['user_id'], game, score, time_taken, json.dumps(data.get('location', {}))))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Score saved', 'score': score})
+
+@app.route('/api/games/leaderboard/<game>', methods=['GET'])
+def get_game_leaderboard(game):
+    scope = request.args.get('scope', 'world')  # world, country, region
+    limit = int(request.args.get('limit', 100))
+    
+    conn = get_db()
+    
+    if scope == 'world':
+        scores = conn.execute('''SELECT gs.*, u.username, u.profile_photo
+                                FROM game_scores gs
+                                JOIN users u ON gs.user_id = u.id
+                                WHERE gs.game = ?
+                                ORDER BY gs.score DESC, gs.time_taken ASC
+                                LIMIT ?''', (game, limit)).fetchall()
+    else:
+        # For country/region filtering
+        scores = conn.execute('''SELECT gs.*, u.username, u.profile_photo
+                                FROM game_scores gs
+                                JOIN users u ON gs.user_id = u.id
+                                WHERE gs.game = ?
+                                ORDER BY gs.score DESC, gs.time_taken ASC
+                                LIMIT ?''', (game, limit)).fetchall()
+    
+    conn.close()
+    return jsonify([dict(s) for s in scores])
+
+@app.route('/api/games/my-stats', methods=['GET'])
+def get_my_game_stats():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = get_db()
+    stats = conn.execute('''SELECT game, MAX(score) as best_score, MIN(time_taken) as best_time,
+                           COUNT(*) as games_played, AVG(score) as avg_score
+                           FROM game_scores
+                           WHERE user_id = ?
+                           GROUP BY game''', (session['user_id'],)).fetchall()
+    conn.close()
+    
+    return jsonify([dict(s) for s in stats])
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

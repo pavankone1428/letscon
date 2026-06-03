@@ -324,6 +324,10 @@ async function submitPost() {
     document.getElementById('postTitle').value = '';
     document.getElementById('postContent').value = '';
     document.getElementById('postTags').value = '';
+    
+    // Gamification
+    if (typeof trackAction !== 'undefined') trackAction('post_created');
+    
     loadFeed();
 }
 
@@ -437,6 +441,10 @@ async function submitComment() {
     await fetch(`/api/posts/${currentCommentPostId}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     input.value = '';
     cancelCommentReply();
+    
+    // Gamification
+    if (typeof trackAction !== 'undefined') trackAction('comment_added');
+    
     loadComments(currentCommentPostId);
     loadFeed();
 }
@@ -481,6 +489,9 @@ async function sendRequest(userId, btn) {
         await fetch('/api/connections/send', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({receiver_id:userId}) });
         if (btn) { btn.innerHTML = '✓ Request Sent'; btn.classList.remove('btn-primary'); btn.classList.add('btn-outline'); }
         else loadPeople();
+        
+        // Gamification
+        if (typeof trackAction !== 'undefined') trackAction('connection_made');
     } catch {
         if (btn) { btn.innerHTML = 'Connect'; btn.disabled = false; }
     }
