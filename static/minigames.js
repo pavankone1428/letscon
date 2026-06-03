@@ -43,6 +43,9 @@ function launchGame(gameName) {
         case 'simon': initSimon(); break;
         case 'typing': initTyping(); break;
         case 'quiz': initQuiz(); break;
+        case 'flappy': initFlappy(); break;
+        case 'whack': initWhackAMole(); break;
+        case 'tic': initTicTacToe(); break;
     }
 }
 
@@ -63,6 +66,18 @@ function updateScore(points) {
 
 function closeGame() {
     if (currentGameTimer) clearInterval(currentGameTimer);
+    
+    // Clean up game-specific timers
+    if (window.whackInterval) clearInterval(window.whackInterval);
+    if (window.whackMoleInterval) clearInterval(window.whackMoleInterval);
+    if (window.simonInterval) clearInterval(window.simonInterval);
+    
+    // Remove keydown listeners for 2048
+    if (window.game2048) {
+        document.removeEventListener('keydown', handle2048Key);
+        window.game2048 = null;
+    }
+    
     const modal = document.getElementById('gameModal');
     if (modal) modal.remove();
 }
@@ -83,6 +98,9 @@ async function endGameSession(won = false) {
                 time: timeTaken
             })
         });
+        
+        // Reload stats after saving
+        setTimeout(loadGameStats, 500);
     } catch(e) {
         console.log('Score save failed:', e);
     }
@@ -680,6 +698,7 @@ function initQuiz() {
     document.getElementById('gameTitle').textContent = '🧠 Brain Quiz';
     window.quizScore = 0;
     window.quizRound = 0;
+    window.quizAnswered = false;
     window.quizQuestions = [
         {q: 'What is 2+2?', a: ['3', '4', '5', '6'], c: 1},
         {q: 'Capital of France?', a: ['London', 'Paris', 'Berlin', 'Madrid'], c: 1},
@@ -696,6 +715,7 @@ function nextQuizQuestion() {
         return;
     }
     
+    window.quizAnswered = false;
     const q = window.quizQuestions[window.quizRound];
     const canvas = document.getElementById('gameCanvas');
     canvas.innerHTML = `
@@ -709,11 +729,23 @@ function nextQuizQuestion() {
                 `).join('')}
             </div>
             <div style="margin-top:1rem;color:#666;">Question ${window.quizRound + 1}/${window.quizQuestions.length}</div>
+            <button class="btn-outline" style="margin-top:1rem;" onclick="skipQuizQuestion()">Skip →</button>
         </div>
     `;
 }
 
+function skipQuizQuestion() {
+    if (window.quizAnswered) return;
+    window.quizAnswered = true;
+    gamification.showToast('⏭️ Skipped!', 800);
+    window.quizRound++;
+    setTimeout(nextQuizQuestion, 800);
+}
+
 function checkQuiz(selected, correct) {
+    if (window.quizAnswered) return;
+    window.quizAnswered = true;
+    
     if (selected === correct) {
         updateScore(200);
         gamification.showToast('✅ Correct!', 800);
@@ -770,5 +802,269 @@ function formatTime(seconds) {
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('gamesTab')) {
         loadLeaderboard('world');
+        loadGameStats();
     }
 });
+
+// Load game stats for cards
+async function loadGameStats() {
+    try {
+        const res = await fetch('/api/games/my-stats');
+        const stats = await res.json();
+        
+        if (stats && !stats.error) {
+            stats.forEach(stat => {
+                updateGameCard(stat.game, stat.best_time, stat.best_score);
+            });
+        }
+    } catch(e) {
+        console.log('Stats not loaded:', e);
+    }
+}
+
+function updateGameCard(game, bestTime, bestScore) {
+    const card = document.querySelector(`.game-card[onclick*="${game}"]`);
+    if (!card) return;
+    
+    const stats = card.querySelector('.game-stats');
+    if (stats) {
+        const timeStr = bestTime ? formatTime(bestTime) : '--';
+        const scoreStr = bestScore || '--';
+        stats.innerHTML = `
+            <span>⏱️ Best: ${timeStr}</span>
+            <span>⭐ High: ${scoreStr}</span>
+        `;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  🐦 GAME 11: FLAPPY BIRD
+// ═══════════════════════════════════════════════════════════
+function initFlappy() {
+    document.getElementById('gameTitle').textContent = '🐦 Flappy Bird';
+    const canvas = document.getElementById('gameCanvas');
+    canvas.innerHTML = `
+        <div class="flappy-game" id="flappyGame">
+            <canvas id="flappyCanvas" width="400" height="500"></canvas>
+            <div style="text-align:center;margin-top:1rem;">
+                <button class="btn-primary" onclick="startFlappy()">Click or Space to Fly</button>
+            </div>
+        </div>
+    `;
+}
+
+function startFlappy() {
+    const canvas = document.getElementById('flappyCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let bird = { y: 250, velocity: 0 };
+    let pipes = [];
+    let score = 0;
+    let gameOver = false;
+    
+    function jump() {
+        if (!gameOver) bird.velocity = -8;
+    }
+    
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') jump();
+    });
+    canvas.onclick = jump;
+    
+    function gameLoop() {
+        if (gameOver) return;
+        
+        ctx.clearRect(0, 0, 400, 500);
+        
+        // Update bird
+        bird.velocity += 0.5;
+        bird.y += bird.velocity;
+        
+        // Draw bird
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(50, bird.y, 15, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Update pipes
+        if (pipes.length === 0 || pipes[pipes.length - 1].x < 200) {
+            const gap = 150;
+            const minY = 100;
+            const maxY = 300;
+            const pipeY = Math.random() * (maxY - minY) + minY;
+            pipes.push({ x: 400, y: pipeY, gap });
+        }
+        
+        pipes = pipes.filter(p => p.x > -50);
+        pipes.forEach(p => {
+            p.x -= 3;
+            
+            // Draw pipes
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(p.x, 0, 50, p.y);
+            ctx.fillRect(p.x, p.y + p.gap, 50, 500 - p.y - p.gap);
+            
+            // Check collision
+            if (50 > p.x && 50 < p.x + 50) {
+                if (bird.y < p.y || bird.y > p.y + p.gap) {
+                    gameOver = true;
+                    updateScore(score * 100);
+                    setTimeout(() => endGameSession(score > 5), 1000);
+                }
+            }
+            
+            // Score
+            if (p.x + 50 === 50) {
+                score++;
+                updateScore(score * 100);
+            }
+        });
+        
+        // Check bounds
+        if (bird.y < 0 || bird.y > 500) {
+            gameOver = true;
+            updateScore(score * 100);
+            setTimeout(() => endGameSession(score > 5), 1000);
+        }
+        
+        // Draw score
+        ctx.fillStyle = '#000';
+        ctx.font = '24px Arial';
+        ctx.fillText(`Score: ${score}`, 10, 30);
+        
+        requestAnimationFrame(gameLoop);
+    }
+    
+    gameLoop();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  🔨 GAME 12: WHACK-A-MOLE
+// ═══════════════════════════════════════════════════════════
+function initWhackAMole() {
+    document.getElementById('gameTitle').textContent = '🔨 Whack-a-Mole';
+    window.whackScore = 0;
+    window.whackTime = 30;
+    window.whackActive = [];
+    
+    const canvas = document.getElementById('gameCanvas');
+    canvas.innerHTML = `
+        <div class="whack-game">
+            <div style="font-size:1.5rem;margin-bottom:1rem;">Time: <span id="whackTimer">30</span>s</div>
+            <div class="whack-grid">
+                ${Array(9).fill(0).map((_, i) => `
+                    <div class="whack-hole" data-index="${i}" onclick="whackMole(${i})">
+                        <div class="mole" id="mole-${i}">🦔</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    startWhackGame();
+}
+
+function startWhackGame() {
+    window.whackInterval = setInterval(() => {
+        window.whackTime--;
+        document.getElementById('whackTimer').textContent = window.whackTime;
+        
+        if (window.whackTime <= 0) {
+            clearInterval(window.whackInterval);
+            clearInterval(window.whackMoleInterval);
+            endGameSession(window.whackScore > 10);
+        }
+    }, 1000);
+    
+    window.whackMoleInterval = setInterval(() => {
+        const index = Math.floor(Math.random() * 9);
+        const mole = document.getElementById(`mole-${index}`);
+        if (mole && !window.whackActive[index]) {
+            mole.style.display = 'block';
+            window.whackActive[index] = true;
+            setTimeout(() => {
+                mole.style.display = 'none';
+                window.whackActive[index] = false;
+            }, 800);
+        }
+    }, 600);
+}
+
+function whackMole(index) {
+    const mole = document.getElementById(`mole-${index}`);
+    if (mole && mole.style.display === 'block') {
+        mole.style.display = 'none';
+        window.whackActive[index] = false;
+        window.whackScore++;
+        updateScore(window.whackScore * 100);
+        gamification.showToast('💥 Hit!', 500);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ❌ GAME 13: TIC-TAC-TOE
+// ═══════════════════════════════════════════════════════════
+function initTicTacToe() {
+    document.getElementById('gameTitle').textContent = '❌ Tic-Tac-Toe';
+    window.ticBoard = Array(9).fill('');
+    window.ticPlayerTurn = true;
+    
+    const canvas = document.getElementById('gameCanvas');
+    canvas.innerHTML = `
+        <div class="tic-game">
+            <div style="margin-bottom:1rem;">You are X | AI is O</div>
+            <div class="tic-grid">
+                ${Array(9).fill(0).map((_, i) => `
+                    <div class="tic-cell" data-index="${i}" onclick="ticMove(${i})"></div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function ticMove(index) {
+    if (!window.ticPlayerTurn || window.ticBoard[index]) return;
+    
+    window.ticBoard[index] = 'X';
+    document.querySelector(`.tic-cell[data-index="${index}"]`).textContent = 'X';
+    
+    if (checkTicWin('X')) {
+        updateScore(1000);
+        setTimeout(() => endGameSession(true), 1000);
+        return;
+    }
+    
+    if (window.ticBoard.every(c => c)) {
+        updateScore(300);
+        setTimeout(() => endGameSession(false), 1000);
+        return;
+    }
+    
+    window.ticPlayerTurn = false;
+    setTimeout(ticAIMove, 500);
+}
+
+function ticAIMove() {
+    const empty = window.ticBoard.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+    if (empty.length === 0) return;
+    
+    const move = empty[Math.floor(Math.random() * empty.length)];
+    window.ticBoard[move] = 'O';
+    document.querySelector(`.tic-cell[data-index="${move}"]`).textContent = 'O';
+    
+    if (checkTicWin('O')) {
+        setTimeout(() => endGameSession(false), 1000);
+        return;
+    }
+    
+    window.ticPlayerTurn = true;
+}
+
+function checkTicWin(player) {
+    const wins = [
+        [0,1,2], [3,4,5], [6,7,8],
+        [0,3,6], [1,4,7], [2,5,8],
+        [0,4,8], [2,4,6]
+    ];
+    return wins.some(w => w.every(i => window.ticBoard[i] === player));
+}

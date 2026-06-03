@@ -122,6 +122,7 @@ function switchTab(btn, source) {
     if (tab === 'referrals') loadReferralRequests();
     if (tab === 'messages') { showConvoView(); loadConversations(); loadMentionConnections(); }
     if (tab === 'insights') loadReviews();
+    if (tab === 'games') { if (typeof loadLeaderboard === 'function') loadLeaderboard('world'); }
     if (tab === 'notifications') loadNotifications();
     if (tab === 'profile') loadProfile();
 }
